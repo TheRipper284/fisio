@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+
+<style>
+    .card-servicio{
+        position: relative;
+        border-radius: 20px;
+        overflow: hidden;
+        padding: 20px;
+        height: 100%;
+        background: #07182E;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    /* Fondo animado giratorio */
+    .card-servicio::before{
+        content: '';
+        position: absolute;
+        width: 250%;
+        height: 250%;
+        background: linear-gradient(
+            0deg,
+            #00b7ff,
+            #ff30ff,
+            #00ff99,
+            #00b7ff
+        );
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        animation: rotarBorde 6s linear infinite;
+        z-index: 0;
+    }
+
+    /* Capa interior para que solo se vea el borde */
+    .card-servicio::after{
+        content: '';
+        position: absolute;
+        inset: 4px; /* grosor del borde */
+        background: #07182E;
+        border-radius: 16px;
+        z-index: 1;
+    }
+
+    .card-content{
+        position: relative;
+        z-index: 2;
+        color: white;
+    }
+
+    /* Animación */
+    @keyframes rotarBorde{
+        from{
+            transform: translate(-50%, -50%) rotate(0deg);
+        }
+        to{
+            transform: translate(-50%, -50%) rotate(360deg);
+        }
+    }
+
+    /* Hover elegante */
+    .card-servicio:hover{
+        transform: translateY(-8px);
+        box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+    }
+
+    .card-content img{
+        border-radius: 12px;
+        transition: transform 0.3s ease;
+    }
+
+    .card-servicio:hover img{
+        transform: scale(1.05);
+    }
+</style>
+
+<div class="container py-5">
+    <h2 class="text-center mb-5">Nuestros Servicios</h2>
+
+    <div class="row">
+
+        {% for servicio in servicios %}
+        <div class="col-md-4 mb-4">
+            <div class="card-servicio h-100">
+                <div class="card-content">
+
+                    {% if servicio.imagen %}
+                    <img src="{{ url_for('static', filename='images/' + servicio.imagen) }}" 
+                        class="img-fluid mb-3 rounded"
+                        style="height: 200px; object-fit: cover; width: 100%;">
+                    {% endif %}
+
+                    <h5 class="text-white">{{ servicio.nombre }}</h5>
+
+                    <p class="text-light small">
+                        {{ servicio.descripcion[:100] }}...
+                    </p>
+
+                    <p class="fw-bold text-info">$ {{ servicio.precio }}</p>
+
+                    <p class="text-light small">
+                        Duración: {{ servicio.duracion_minutos }} minutos
+                    </p>
+
+                    <div class="d-flex gap-2 mt-3">
+                        <a href="{{ url_for('servicio_detalle', id=servicio.id) }}"
+                        class="btn btn-outline-info btn-sm w-100"> Ver más</a>
+
+                        <button class="btn btn-success btn-sm w-100"
+                            data-bs-toggle="modal"
+                            data-bs-target="#modalAgendar">
+                            Agendar
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+
+    </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow border-0 rounded-4">
+                <div class="card-header bg-dark text-white py-3">
+                    <h4 class="mb-0">Registrar Nuevo Usuario</h4>
+                </div>
+                <div class="card-body p-4">
+                    <form method="POST">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label" for="nombre">Nombre Completo</label>
+                                <input class="form-control" id="nombre" name="nombre" type="text"
+                                    placeholder="Juan Pérez" required />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="rol">Rol del Usuario</label>
+                                <select class="form-select" id="rol" name="rol" required>
+                                    <option value="cliente">Cliente</option>
+                                    <option value="empleado">Empleado (Fisio)</option>
+                                    <option value="admin">Administrador</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="email">Correo Electrónico</label>
+                            <input class="form-control" id="email" name="email" type="email"
+                                placeholder="ejemplo@correo.com" required />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="telefono">Teléfono</label>
+                            <input class="form-control" id="telefono" name="telefono" type="text"
+                                placeholder="10 dígitos" />
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label" for="password">Contraseña Temporal</label>
+                            <input class="form-control" id="password" name="password" type="password"
+                                placeholder="Asigna una contraseña inicial" required />
+                        </div>
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-primary py-2" type="submit">Crear Usuario</button>
+                            <a href="{{ url_for('gestion_usuarios') }}" class="btn btn-link text-muted">Cancelar</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

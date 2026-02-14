@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Centro de Fisioterapia</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
+    integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+  <style>
+    /* Estilos Originales del Formulario */
+    .modal-content-original {
+      background-color: #1a1a1a !important;
+      border: 1px solid #333 !important;
+      border-radius: 20px !important;
+      padding: 20px !important;
+      color: #fff !important;
+    }
+
+    .form-original {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .title-original {
+      font-size: 28px;
+      font-weight: 600;
+      letter-spacing: -1px;
+      position: relative;
+      display: flex;
+      align-items: center;
+      padding-left: 30px;
+      color: #00bfff;
+    }
+
+    .title-original::before,
+    .title-original::after {
+      position: absolute;
+      content: "";
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      left: 0px;
+      background-color: #00bfff;
+    }
+
+    .title-original::after {
+      width: 18px;
+      height: 18px;
+      animation: pulse-original 1s linear infinite;
+    }
+
+    .message-original {
+      font-size: 14.5px;
+      color: rgba(255, 255, 255, 0.7);
+      margin-bottom: 5px;
+    }
+
+    .form-original label {
+      position: relative;
+      width: 100%;
+    }
+
+    .form-original label .input-original {
+      background-color: #333;
+      color: #fff;
+      padding: 20px 5px 5px 10px;
+      outline: 0;
+      border: 1px solid rgba(105, 105, 105, 0.397);
+      border-radius: 10px;
+      width: 100%;
+      font-size: medium;
+    }
+
+    .form-original label .input-original+span {
+      color: rgba(255, 255, 255, 0.5);
+      position: absolute;
+      left: 10px;
+      top: 0px;
+      font-size: 0.9em;
+      transition: 0.3s ease;
+      pointer-events: none;
+    }
+
+    .form-original label .input-original:placeholder-shown+span {
+      top: 12.5px;
+      font-size: 0.9em;
+    }
+
+    .form-original label .input-original:focus+span,
+    .form-original label .input-original:not(:placeholder-shown)+span,
+    .form-original label .input-original:valid+span {
+      color: #00bfff;
+      top: 0px;
+      font-size: 0.7em;
+      font-weight: 600;
+    }
+
+    .submit-original {
+      border: none;
+      outline: none;
+      padding: 10px;
+      border-radius: 10px;
+      color: #fff;
+      font-size: 16px;
+      transition: .3s ease;
+      background-color: #00bfff;
+      width: 100%;
+      margin-top: 10px;
+    }
+
+    .submit-original:hover {
+      background-color: #00bfff96;
+    }
+
+    @keyframes pulse-original {
+      from {
+        transform: scale(0.9);
+        opacity: 1;
+      }
+
+      to {
+        transform: scale(1.8);
+        opacity: 0;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <nav class="navbar navbar-expand-lg bg-body-tertiary">
+    <div class="container-fluid">
+      <!---LOGO--->
+      <a class="navbar-brand d-flex align-items-center" href="{{ url_for('index') }}">
+        <img src="{{ url_for('static', filename='images/Centro_de_fisioterapia.png') }}" alt="Centro de Fisioterapia"
+          height="45" class="me-2">
+        <span class="fw-bold text-success">Centro de Fisioterapia</span>
+      </a>
+      <!-- Botón mobile -->
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <!---MENU--->
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-2">
+          <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('index') }}">Inicio</a>
+          </li>
+
+          <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('servicios') }}">Servicios</a>
+          </li>
+
+          <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('ubicacion') }}">Ubicación</a>
+          </li>
+
+          <li class="nav-item">
+            <button type="button" class="btn btn-success px-3" data-bs-toggle="modal" data-bs-target="#modalAgendar">
+              Agendar cita
+            </button>
+          </li>
+
+          {% if current_user.is_authenticated %}
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown"
+              aria-expanded="false">
+              Hola, {{ current_user.nombre }}
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
+              {% if current_user.rol == 'admin' %}
+              <li><a class="dropdown-item" href="{{ url_for('admin') }}">Panel Admin</a></li>
+              <li><a class="dropdown-item" href="{{ url_for('gestion_usuarios') }}">Gestionar Usuarios</a></li>
+              <li><a class="dropdown-item" href="{{ url_for('admin_stats') }}">Estadísticas</a></li>
+              {% endif %}
+              {% if current_user.rol == 'empleado' %}
+              <li><a class="dropdown-item" href="{{ url_for('empleado_dashboard') }}">Mi Agenda</a></li>
+              {% endif %}
+              <li>
+                <hr class="dropdown-divider">
+              </li>
+              <li><a class="dropdown-item" href="{{ url_for('logout') }}">Cerrar Sesión</a></li>
+            </ul>
+          </li>
+          {% else %}
+          <li class="nav-item">
+            <a class="nav-link btn btn-outline-success ms-2" href="{{ url_for('login') }}">Iniciar Sesión</a>
+          </li>
+          {% endif %}
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <hr>
+
+  <div class="container mt-3">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    {% for category, message in messages %}
+    <div class="alert alert-{{ category }} alert-dismissible fade show">
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
+    {% endif %}
+    {% endwith %}
+  </div>
+
+  {% block content %}
+  {% endblock %}
+
+  <!-- Modal para Agendar Cita con Estilos Originales -->
+  <div class="modal fade" id="modalAgendar" tabindex="-1" aria-labelledby="modalAgendarLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content modal-content-original">
+        <div class="d-flex justify-content-end">
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+
+        <form class="form-original" action="{{ url_for('agendar') }}" method="POST" id="formAgendar">
+          <p class="title-original">Agendar Cita</p>
+          <p class="message-original">Reserva tu cita con nuestros especialistas.</p>
+
+          {% if not current_user.is_authenticated %}
+          <!-- Nombre -->
+          <label>
+            <input class="input-original" type="text" name="nombre" placeholder=" " required>
+            <span>Nombre completo</span>
+          </label>
+
+          <!-- Correo -->
+          <label>
+            <input class="input-original" type="email" name="email" placeholder=" " required>
+            <span>Correo electrónico</span>
+          </label>
+
+          <!-- Teléfono -->
+          <label>
+            <input class="input-original" type="tel" name="telefono" pattern="[0-9]{10}" maxlength="10" placeholder=" "
+              inputmode="numeric">
+            <span>Teléfono</span>
+          </label>
+          {% endif %}
+
+          <!-- Servicios -->
+          <label>
+            <select class="input-original" name="servicio_id" id="servicioSelect" required>
+              <option value="" disabled selected></option>
+              {% for servicio in servicios_global %}
+              <option value="{{ servicio.id }}">{{ servicio.nombre }}</option>
+              {% endfor %}
+            </select>
+            <span>Selecciona un servicio</span>
+          </label>
+
+          <!-- Fecha -->
+          <label>
+            <input class="input-original" type="date" name="fecha" id="fechaInput" min="{{ fecha_actual_global }}"
+              placeholder=" " required>
+            <span>Fecha</span>
+          </label>
+          <label>
+            <select class="input-original" name="hora" id="horaSelect" required disabled>
+              <option value="" disabled selected>Elige fecha primero</option>
+            </select>
+            <span>Hora</span>
+          </label>
+
+          <button class="submit-original">Agendar</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    const fechaInput = document.getElementById('fechaInput');
+    const servicioSelect = document.getElementById('servicioSelect');
+    const horaSelect = document.getElementById('horaSelect');
+
+    async function actualizarSlots() {
+      const fecha = fechaInput.value;
+      const servicioId = servicioSelect.value;
+
+      if (fecha && servicioId) {
+        horaSelect.disabled = true;
+        horaSelect.innerHTML = '<option value="" disabled selected>Cargando...</option>';
+
+        try {
+          const response = await fetch(`/api/slots?fecha=${fecha}&servicio_id=${servicioId}`);
+          const data = await response.json();
+
+          horaSelect.innerHTML = '<option value="" disabled selected>Seleccione una hora</option>';
+          if (data.slots && data.slots.length > 0) {
+            data.slots.forEach(slot => {
+              const option = document.createElement('option');
+              option.value = slot;
+              option.textContent = slot;
+              horaSelect.appendChild(option);
+            });
+            horaSelect.disabled = false;
+          } else {
+            horaSelect.innerHTML = '<option value="" disabled selected>No hay horarios disponibles</option>';
+          }
+        } catch (error) {
+          console.error('Error fetching slots:', error);
+          horaSelect.innerHTML = '<option value="" disabled selected>Error al cargar</option>';
+        }
+      }
+    }
+
+    if (fechaInput) fechaInput.addEventListener('change', actualizarSlots);
+    if (servicioSelect) servicioSelect.addEventListener('change', actualizarSlots);
+  </script>
+</body>
+
+</html>

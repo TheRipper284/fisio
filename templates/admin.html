@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-4">
+
+    <h2 class="mb-4">Panel de Administración</h2>
+
+    <!-- ========================= -->
+    <!--        CITAS              -->
+    <!-- ========================= -->
+
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <h4>Citas Registradas</h4>
+        </div>
+        <div class="col-md-6 text-end">
+            <form class="d-flex" method="GET">
+                <input class="form-control me-2" type="search" name="q" placeholder="Buscar por teléfono..."
+                    value="{{ search_query }}">
+                <button class="btn btn-primary" type="submit">Buscar</button>
+                {% if search_query %}
+                <a href="{{ url_for('admin') }}" class="btn btn-link">Limpiar</a>
+                {% endif %}
+            </form>
+        </div>
+    </div>
+
+    {% if citas %}
+    <div class="table-responsive">
+        <table class="table table-hover table-bordered align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th>ID</th>
+                    <th>Cliente</th>
+                    <th>Teléfono</th>
+                    <th>Servicio</th>
+                    <th>Horario</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cita in citas %}
+                <tr>
+                    <td>{{ cita.id }}</td>
+                    <td>{{ cita.cliente.nombre }}</td>
+                    <td>{{ cita.cliente.telefono }}</td>
+                    <td>{{ cita.servicio.nombre }}</td>
+                    <td>
+                        {{ cita.fecha_inicio.strftime('%d/%m %H:%M') }} - {{ cita.fecha_fin.strftime('%H:%M') }}
+                    </td>
+                    <td>
+                        <span class="badge 
+                {% if cita.estado == 'Pendiente' %} bg-warning
+                {% elif cita.estado == 'Confirmada' %} bg-primary
+                {% elif cita.estado == 'Cancelada' %} bg-danger
+                {% elif cita.estado == 'Completada' %} bg-success
+                {% endif %}
+                ">
+                            {{ cita.estado }}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="btn-group btn-group-sm">
+                            <a href="{{ url_for('actualizar_cita_status', id=cita.id, nuevo_estado='Confirmada') }}"
+                                class="btn btn-outline-primary" title="Confirmar">✓</a>
+                            <a href="{{ url_for('actualizar_cita_status', id=cita.id, nuevo_estado='Completada') }}"
+                                class="btn btn-outline-success" title="Completar">★</a>
+                            <a href="{{ url_for('actualizar_cita_status', id=cita.id, nuevo_estado='Cancelada') }}"
+                                class="btn btn-outline-danger" title="Cancelar">✕</a>
+                            <a href="{{ url_for('ver_paciente', id=cita.cliente_id) }}" class="btn btn-info text-white"
+                                title="Ver Expediente">📁</a>
+                        </div>
+
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% else %}
+    <p>No hay citas registradas.</p>
+    {% endif %}
+
+    <hr class="my-5">
+
+    <!-- ========================= -->
+    <!--        SERVICIOS          -->
+    <!-- ========================= -->
+
+    <h4>Gestionar Servicios</h4>
+
+    <form action="{{ url_for('agregar_servicio') }}" method="POST" class="row g-3 mb-4">
+
+        <div class="col-md-3">
+            <input type="text" name="nombre" class="form-control" placeholder="Nombre" required>
+        </div>
+
+        <div class="col-md-2">
+            <input type="number" step="0.01" name="precio" class="form-control" placeholder="Precio ($)" required>
+        </div>
+
+        <div class="col-md-2">
+            <input type="number" name="duracion" class="form-control" placeholder="Duración (min)" required>
+        </div>
+
+        <div class="col-md-2">
+            <input type="text" name="categoria" class="form-control" placeholder="Categoría">
+        </div>
+
+        <div class="col-md-2">
+            <button type="submit" class="btn btn-success w-100">Agregar</button>
+        </div>
+
+
+    </form>
+
+    {% if servicios %}
+    <div class="table-responsive">
+        <table class="table table-bordered align-middle">
+            <thead class="table-secondary">
+                <tr>
+                    <th>ID</th>
+                    <th>Nombre</th>
+                    <th>Precio</th>
+                    <th>Duración</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for servicio in servicios %}
+                <tr>
+                    <td>{{ servicio.id }}</td>
+                    <td>{{ servicio.nombre }}</td>
+                    <td>$ {{ servicio.precio }}</td>
+                    <td>{{ servicio.duracion_minutos }} min</td>
+                    <td>
+                        <div class="btn-group btn-group-sm">
+                            <a href="{{ url_for('asignar_especialistas', id=servicio.id) }}"
+                                class="btn btn-outline-primary">Asignar</a>
+                            <a href="{{ url_for('eliminar_servicio', id=servicio.id) }}" class="btn btn-outline-danger"
+                                onclick="return confirm('¿Eliminar servicio?')">Eliminar</a>
+                        </div>
+                    </td>
+
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p>No hay servicios registrados.</p>
+    {% endif %}
+
+</div>
+{% endblock %}

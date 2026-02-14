@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-4">
+    <h2>Estadísticas de la Clínica</h2>
+
+    <div class="row mt-4">
+        <div class="col-md-4 mb-4">
+            <div class="card bg-primary text-white shadow rounded-4 border-0">
+                <div class="card-body text-center p-4">
+                    <h1 class="display-4 fw-bold">{{ total }}</h1>
+                    <p class="lead mb-0">Total de Citas</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-4">
+            <div class="card bg-success text-white shadow rounded-4 border-0">
+                <div class="card-body text-center p-4">
+                    <h1 class="display-4 fw-bold">{{ completadas }}</h1>
+                    <p class="lead mb-0">Sesiones Completadas</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-md-8">
+            <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0">Popularidad de Servicios</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>Servicio</th>
+                                <th>Citas</th>
+                                <th>Gráfica</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for nombre, count in populares %}
+                            <tr>
+                                <td>{{ nombre }}</td>
+                                <td>{{ count }}</td>
+                                <td style="width: 50%;">
+                                    <div class="progress" style="height: 10px;">
+                                        <div class="progress-bar" role="progressbar"
+                                            style="width: {{ (count / total * 100)|int if total > 0 else 0 }}%;"></div>
+
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

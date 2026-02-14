@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Mi Agenda de Citas</h2>
+        <span class="badge bg-info p-2">{{ current_user.nombre }} (Especialista)</span>
+    </div>
+
+    {% if citas %}
+    <div class="table-responsive">
+        <table class="table table-hover align-middle shadow-sm rounded">
+            <thead class="table-primary">
+                <tr>
+                    <th>Horario</th>
+                    <th>Paciente</th>
+                    <th>Servicio</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cita in citas %}
+                <tr>
+                    <td>
+                        <div class="fw-bold">{{ cita.fecha_inicio.strftime('%H:%M') }}</div>
+                        <small class="text-muted">{{ cita.fecha_inicio.strftime('%d/%m/%Y') }}</small>
+                    </td>
+                    <td>
+                        <div>{{ cita.cliente.nombre }}</div>
+                        <small class="text-muted">{{ cita.cliente.telefono }}</small>
+                    </td>
+                    <td>{{ cita.servicio.nombre }}</td>
+                    <td>
+                        <span class="badge 
+                        {% if cita.estado == 'Pendiente' %} bg-warning
+                        {% elif cita.estado == 'Confirmada' %} bg-primary
+                        {% elif cita.estado == 'Cancelada' %} bg-danger
+                        {% elif cita.estado == 'Completada' %} bg-success
+                        {% endif %}">
+                            {{ cita.estado }}
+                        </span>
+                    </td>
+                    <td>
+                        <a href="{{ url_for('ver_paciente', id=cita.cliente_id) }}"
+                            class="btn btn-sm btn-outline-primary">
+                            Ver Expediente
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="text-center py-5">
+        <p class="text-muted lead">No tienes citas asignadas para hoy.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

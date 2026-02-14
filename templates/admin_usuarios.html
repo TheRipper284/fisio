@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Gestión de Usuarios</h2>
+        <a href="{{ url_for('crear_usuario') }}" class="btn btn-success">
+            + Nuevo Usuario
+        </a>
+    </div>
+
+    <div class="card shadow-sm border-0 rounded-4">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Nombre</th>
+                            <th>Email</th>
+                            <th>Teléfono</th>
+                            <th>Rol</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for usuario in usuarios %}
+                        <tr>
+                            <td>
+                                <div class="fw-bold">{{ usuario.nombre }}</div>
+                            </td>
+                            <td>{{ usuario.email }}</td>
+                            <td>{{ usuario.telefono or 'N/A' }}</td>
+                            <td>
+                                <span class="badge 
+                                {% if usuario.rol == 'admin' %} bg-danger
+                                {% elif usuario.rol == 'empleado' %} bg-info
+                                {% else %} bg-secondary
+                                {% endif %}">
+                                    {{ usuario.rol|capitalize }}
+                                </span>
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{{ url_for('editar_usuario', id=usuario.id) }}"
+                                        class="btn btn-outline-primary">Editar</a>
+                                </div>
+                            </td>
+
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

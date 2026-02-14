@@ -1,0 +1,46 @@
+ * Serving Flask app 'app'
+ * Debug mode: on
+WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on http://127.0.0.1:5000
+Press CTRL+C to quit
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 772-249-085
+Note: Unnecessary use of -X or --request, POST is already inferred.
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0*   Trying 127.0.0.1:5000...
+* Connected to 127.0.0.1 (127.0.0.1) port 5000 (#0)
+> POST /agendar HTTP/1.1
+> Host: 127.0.0.1:5000
+> User-Agent: curl/7.88.1
+> Accept: */*
+> Content-Length: 70
+> Content-Type: application/x-www-form-urlencoded
+> 
+} [70 bytes data]
+< HTTP/1.1 500 INTERNAL SERVER ERROR
+< Server: Werkzeug/3.1.5 Python/3.13.2
+< Date: Fri, 13 Feb 2026 13:30:22 GMT
+< Content-Type: text/html; charset=utf-8
+< Content-Length: 265
+< Connection: close
+< 
+{ [265 bytes data]
+100   335  100   265  100    70   1494    394 --:--:-- --:--:-- --:--:--  1892<!doctype html>
+<html lang=en>
+<title>500 Internal Server Error</title>
+<h1>Internal Server Error</h1>
+<p>The server encountered an internal error and was unable to complete your request. Either the server is overloaded or there is an error in the application.</p>
+
+* Closing connection 0
+Error: Argumento u opci¢n no v lido - "F:/".
+Escriba "TASKKILL /?" para su uso.
+ * Detected change in 'C:\\Users\\santi\\Downloads\\app\\fisio_web\\app.py', reloading
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 772-249-085
+ * Detected change in 'C:\\Users\\santi\\Downloads\\app\\fisio_web\\app.py', reloading
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 772-249-085

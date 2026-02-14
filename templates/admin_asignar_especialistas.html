@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow border-0 rounded-4">
+                <div class="card-header bg-primary text-white py-3">
+                    <h4 class="mb-0">Asignar Especialistas a: {{ servicio.nombre }}</h4>
+                </div>
+                <div class="card-body p-4">
+                    <p class="text-muted">Selecciona los empleados que pueden realizar este servicio.</p>
+
+                    <form method="POST">
+                        <div class="row g-3">
+                            {% for empleado in empleados %}
+                            <div class="col-md-6">
+                                <div
+                                    class="card border rounded-3 p-3 h-100 {% if empleado in servicio.especialistas %} border-primary bg-light {% endif %}">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="empleados"
+                                            value="{{ empleado.id }}" id="emp{{ empleado.id }}"
+                                            {% if empleado in servicio.especialistas %} checked {% endif %}>
+                                        <label class="form-check-label d-block ms-2" for="emp{{ empleado.id }}">
+                                            <div class="fw-bold">{{ empleado.nombre }}</div>
+                                            <div class="small text-muted">{{ empleado.email }}</div>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            {% else %}
+                            <div class="col-12 text-center py-4">
+                                <p class="mb-0">No hay empleados registrados con el rol 'empleado'.</p>
+                                <a href="{{ url_for('crear_usuario') }}" class="btn btn-link mt-2">Crear primer
+                                    empleado</a>
+                            </div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="d-grid gap-2 mt-5">
+                            <button class="btn btn-primary py-2 btn-lg" type="submit">Guardar Asignaciones</button>
+                            <a href="{{ url_for('admin') }}" class="btn btn-link text-muted">Volver al Panel
+                                Administrativo</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .form-check-input:checked+.form-check-label {
+        color: var(--bs-primary);
+    }
+</style>
+{% endblock %}

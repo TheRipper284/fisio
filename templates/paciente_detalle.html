@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-4">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('empleado_dashboard') }}">Mi Agenda</a></li>
+            <li class="breadcrumb-item active">Expediente: {{ paciente.nombre }}</li>
+        </ol>
+    </nav>
+
+    <div class="row">
+        <!-- Información Básica del Paciente -->
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm rounded-4 mb-4">
+                <div class="card-body text-center p-4">
+                    <img src="https://ui-avatars.com/api/?name={{ paciente.nombre }}&background=random"
+                        class="rounded-circle mb-3" width="100">
+                    <h4>{{ paciente.nombre }}</h4>
+                    <p class="text-muted mb-1"><i class="bi bi-envelope"></i> {{ paciente.email }}</p>
+                    <p class="text-muted"><i class="bi bi-telephone"></i> {{ paciente.telefono }}</p>
+                    <hr>
+                    <div class="text-start">
+                        <h6>Antecedentes:</h6>
+                        <p class="small text-muted">{{ paciente.expediente.antecedentes or 'Sin registrar' }}</p>
+                        <h6>Alergias:</h6>
+                        <p class="small text-danger">{{ paciente.expediente.alergias or 'Ninguna conocida' }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notas de Evolución -->
+        <div class="col-md-8">
+            <div class="card border-0 shadow-sm rounded-4 mb-4">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0">Notas de Evolución</h5>
+                </div>
+                <div class="card-body">
+                    <!-- Formulario para nueva nota -->
+                    <form action="{{ url_for('agregar_nota', id=paciente.id) }}" method="POST" class="mb-4">
+                        <div class="mb-3">
+                            <textarea class="form-control" name="contenido" rows="3"
+                                placeholder="Escribe aquí lo observado en la sesión..." required></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Guardar Nota</button>
+                    </form>
+
+                    <div class="list-group list-group-flush">
+                        {% for nota in paciente.expediente.notas|sort(attribute='fecha', reverse=True) %}
+                        <div class="list-group-item px-0 py-3">
+                            <div class="d-flex justify-content-between">
+                                <h6 class="mb-1 text-primary">{{ nota.autor.nombre }}</h6>
+                                <small class="text-muted">{{ nota.fecha.strftime('%d/%m/%Y %H:%M') }}</small>
+                            </div>
+                            <p class="mb-1">{{ nota.contenido }}</p>
+                        </div>
+                        {% else %}
+                        <p class="text-center text-muted py-3">No hay notas registradas todavía.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
