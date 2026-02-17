@@ -1,6 +1,86 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h1>Bienvenido al Centro de Fisioterapia</h1>
-<p>Ofrecemos servicios de fisioterapia personalizados para mejorar tu salud y bienestar.</p>
+<!-- Hero Section -->
+<div class="bg-light py-5 mb-5 border-bottom">
+    <div class="container py-5">
+        <div class="row align-items-center">
+            <div class="col-lg-6">
+                <h1 class="display-3 fw-bold text-success mb-3">Recupera tu Bienestar</h1>
+                <p class="lead text-muted mb-4">Especialistas en fisioterapia deportiva y rehabilitación con un enfoque
+                    personalizado para tu recuperación total.</p>
+                <div class="d-grid gap-2 d-md-flex">
+                    {% if current_user.is_authenticated %}
+                    <button type="button" class="btn btn-success btn-lg px-4 me-md-2" data-bs-toggle="modal" data-bs-target="#modalAgendar">Agendar Cita</button>
+                    {% else %}
+                    <a class="btn btn-success btn-lg px-4 me-md-2" href="{{ url_for('login', next=url_for('agendar')) }}">Agendar Cita (inicia sesión)</a>
+                    {% endif %}
+                    <a href="{{ url_for('servicios') }}" class="btn btn-outline-secondary btn-lg px-4">Ver Servicios</a>
+                </div>
+            </div>
+            <div class="col-lg-6 d-none d-lg-block">
+                <img src="{{ url_for('static', filename='images/Centro_de_fisioterapia.png') }}"
+                    class="img-fluid rounded-4 shadow-lg" alt="Fisioterapia">
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container pb-5">
+    <!-- Testimonios Section -->
+    {% if testimonios %}
+    <section class="mb-5 py-5">
+        <div class="text-center mb-5">
+            <h2 class="fw-bold">Lo que dicen nuestros pacientes</h2>
+            <p class="text-muted">La satisfacción de quienes confían en nosotros es nuestra mejor garantía.</p>
+        </div>
+        <div class="row g-4">
+            {% for t in testimonios %}
+            <div class="col-md-4">
+                <div class="card h-100 border-0 shadow-sm rounded-4 text-center p-3">
+                    <div class="card-body">
+                        <div class="text-warning mb-3">
+                            {% for i in range(t.estrellas) %}★{% endfor %}
+                        </div>
+                        <p class="fst-italic text-muted mb-3">"{{ t.contenido }}"</p>
+                        <h6 class="fw-bold mb-0">{{ t.nombre_cliente }}</h6>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    <!-- FAQ Section -->
+    {% if faqs %}
+    <section class="py-5">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="text-center mb-5">
+                    <h2 class="fw-bold">Preguntas Frecuentes</h2>
+                    <p class="text-muted">Resolvemos tus dudas antes de tu primera sesión.</p>
+                </div>
+                <div class="accordion accordion-flush shadow-sm rounded-4 overflow-hidden" id="faqAccordion">
+                    {% for faq in faqs %}
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed fw-bold px-4 py-3" type="button"
+                                data-bs-toggle="collapse" data-bs-target="#faq{{ faq.id }}">
+                                {{ faq.pregunta }}
+                            </button>
+                        </h2>
+                        <div id="faq{{ faq.id }}" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                            <div class="accordion-body px-4 py-3 text-muted">
+                                {{ faq.respuesta }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </section>
+    {% endif %}
+</div>
 {% endblock %}

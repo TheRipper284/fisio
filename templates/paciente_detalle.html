@@ -21,17 +21,42 @@
                     <p class="text-muted"><i class="bi bi-telephone"></i> {{ paciente.telefono }}</p>
                     <hr>
                     <div class="text-start">
-                        <h6>Antecedentes:</h6>
-                        <p class="small text-muted">{{ paciente.expediente.antecedentes or 'Sin registrar' }}</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h6>Antecedentes:</h6>
+                            <button class="btn btn-link btn-sm p-0" data-bs-toggle="collapse"
+                                data-bs-target="#editExpediente">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                        </div>
+                        <p class="small text-muted mb-3">{{ paciente.expediente.antecedentes or 'Sin registrar' }}</p>
+
                         <h6>Alergias:</h6>
-                        <p class="small text-danger">{{ paciente.expediente.alergias or 'Ninguna conocida' }}</p>
+                        <p class="small text-danger mb-3">{{ paciente.expediente.alergias or 'Ninguna conocida' }}</p>
+
+                        <!-- Formulario de Edición colapsable -->
+                        <div class="collapse" id="editExpediente">
+                            <form action="{{ url_for('editar_expediente', id=paciente.id) }}" method="POST"
+                                class="bg-light p-2 rounded-3 border">
+                                <div class="mb-2">
+                                    <label class="small fw-bold">Antecedentes:</label>
+                                    <textarea name="antecedentes" class="form-control form-control-sm"
+                                        rows="3">{{ paciente.expediente.antecedentes or '' }}</textarea>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="small fw-bold">Alergias:</label>
+                                    <textarea name="alergias" class="form-control form-control-sm"
+                                        rows="2">{{ paciente.expediente.alergias or '' }}</textarea>
+                                </div>
+                                <button type="submit" class="btn btn-success btn-sm w-100">Actualizar</button>
+                            </form>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- Notas de Evolución -->
-        <div class="col-md-8">
+        <div class="col-md-5">
             <div class="card border-0 shadow-sm rounded-4 mb-4">
                 <div class="card-header bg-white py-3">
                     <h5 class="mb-0">Notas de Evolución</h5>
@@ -41,26 +66,76 @@
                     <form action="{{ url_for('agregar_nota', id=paciente.id) }}" method="POST" class="mb-4">
                         <div class="mb-3">
                             <textarea class="form-control" name="contenido" rows="3"
-                                placeholder="Escribe aquí lo observado en la sesión..." required></textarea>
+                                placeholder="Escribe aquí lo observado..." required></textarea>
                         </div>
-                        <button type="submit" class="btn btn-primary">Guardar Nota</button>
+                        <button type="submit" class="btn btn-primary btn-sm">Guardar Nota</button>
                     </form>
 
-                    <div class="list-group list-group-flush">
+                    <div class="list-group list-group-flush" style="max-height: 400px; overflow-y: auto;">
                         {% for nota in paciente.expediente.notas|sort(attribute='fecha', reverse=True) %}
-                        <div class="list-group-item px-0 py-3">
+                        <div class="list-group-item px-0 py-3 border-0 border-bottom">
                             <div class="d-flex justify-content-between">
-                                <h6 class="mb-1 text-primary">{{ nota.autor.nombre }}</h6>
-                                <small class="text-muted">{{ nota.fecha.strftime('%d/%m/%Y %H:%M') }}</small>
+                                <h6 class="mb-1 text-primary small">{{ nota.autor.nombre }}</h6>
+                                <small class="text-muted"
+                                    style="font-size: 0.7rem;">{{ nota.fecha.strftime('%d/%m/%Y %H:%M') }}</small>
                             </div>
-                            <p class="mb-1">{{ nota.contenido }}</p>
+                            <p class="mb-1 small">{{ nota.contenido }}</p>
                         </div>
                         {% else %}
-                        <p class="text-center text-muted py-3">No hay notas registradas todavía.</p>
+                        <p class="text-center text-muted py-3 small">No hay notas todavía.</p>
                         {% endfor %}
                     </div>
                 </div>
             </div>
+        </div>
+
+        <!-- Diagnósticos y Mensajes -->
+        <div class="col-md-3">
+            <!-- Diagnósticos -->
+            <div class="card border-0 shadow-sm rounded-4 mb-4">
+                <div class="card-header bg-success text-white py-3">
+                    <h5 class="mb-0 small"><i class="bi bi-clipboard-pulse me-2"></i>Diagnóstico</h5>
+                </div>
+                <div class="card-body">
+                    {% for diag in paciente.expediente.diagnosticos|sort(attribute='fecha', reverse=True) %}
+                    <div class="mb-2 p-2 border rounded-3 bg-light">
+                        <p class="fw-bold mb-1 small">{{ diag.descripcion }}</p>
+                        {% if diag.plan_tratamiento %}
+                        <p class="text-muted mb-0" style="font-size: 0.75rem;">{{ diag.plan_tratamiento }}</p>
+                        {% endif %}
+                        <small class="text-muted d-block mt-1"
+                            style="font-size: 0.65rem;">{{ diag.fecha.strftime('%d/%m/%Y') }} -
+                            {{ diag.especialista.nombre }}</small>
+                    </div>
+                    {% else %}
+                    <p class="text-muted small">Sin diagnósticos formales.</p>
+                    {% endfor %}
+
+                    <button class="btn btn-outline-success btn-sm w-100 mt-2" data-bs-toggle="collapse"
+                        data-bs-target="#formDiagnostico">
+                        Nuevo Diagnóstico
+                    </button>
+
+                    <div class="collapse mt-3" id="formDiagnostico">
+                        <form action="{{ url_for('agregar_diagnostico', id=paciente.id) }}" method="POST">
+                            <div class="mb-2">
+                                <input type="text" name="descripcion" class="form-control form-control-sm"
+                                    placeholder="Diagnóstico" required>
+                            </div>
+                            <div class="mb-3">
+                                <textarea name="plan_tratamiento" class="form-control form-control-sm" rows="2"
+                                    placeholder="Plan de tratamiento"></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-success btn-sm w-100">Registrar</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Botón Mensajería -->
+            <a href="{{ url_for('mensajeria') }}" class="btn btn-primary w-100 rounded-3 py-3 shadow-sm mb-4">
+                <i class="bi bi-chat-dots me-2"></i> Enviar Mensaje
+            </a>
         </div>
     </div>
 </div>

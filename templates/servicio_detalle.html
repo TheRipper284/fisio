@@ -12,8 +12,8 @@
     <div class="row align-items-center">
         <div class="col-md-6">
             {% if servicio.imagen %}
-            <img src="{{ url_for('static', filename='images/' + servicio.imagen) }}"
-                class="img-fluid rounded-4 shadow-sm" alt="{{ servicio.nombre }}">
+            <img src="{{ servicio.imagen if servicio.imagen.startswith('http') else url_for('static', filename='images/' + servicio.imagen) }}"
+                class="img-fluid rounded-4 shadow-sm" alt="{{ servicio.nombre }}" onerror="this.style.display='none'">
             {% else %}
             <div class="bg-light rounded-4 d-flex align-items-center justify-content-center" style="height: 400px;">
                 <span class="text-muted">Sin imagen disponible</span>
@@ -60,10 +60,11 @@
 
 
             <div class="d-grid">
-                <button class="btn btn-success btn-lg py-3 rounded-pill" data-bs-toggle="modal"
-                    data-bs-target="#modalAgendar">
-                    Agendar cita ahora
-                </button>
+                {% if current_user.is_authenticated %}
+                <button class="btn btn-success btn-lg py-3 rounded-pill" data-bs-toggle="modal" data-bs-target="#modalAgendar" data-service-id="{{ servicio.id }}">Agendar cita ahora</button>
+                {% else %}
+                <a class="btn btn-success btn-lg py-3 rounded-pill" href="{{ url_for('login', next=url_for('agendar')) }}">Agendar cita (inicia sesión)</a>
+                {% endif %}
             </div>
         </div>
     </div>

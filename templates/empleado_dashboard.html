@@ -2,60 +2,208 @@
 
 {% block content %}
 <div class="container py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>Mi Agenda de Citas</h2>
-        <span class="badge bg-info p-2">{{ current_user.nombre }} (Especialista)</span>
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <div>
+            <h2 class="mb-1">Mi Agenda</h2>
+            <p class="text-muted small mb-0">Solo ves <strong>tus</strong> citas asignadas. Aquí atiendes pacientes y
+                registras notas.</p>
+        </div>
+        <div class="text-end">
+            <a href="{{ url_for('mensajeria') }}" class="btn btn-outline-primary me-2">
+                <i class="bi bi-chat-dots me-1"></i> Mensajes
+            </a>
+            <span class="badge bg-primary p-2">Especialista</span>
+        </div>
     </div>
 
-    {% if citas %}
-    <div class="table-responsive">
-        <table class="table table-hover align-middle shadow-sm rounded">
-            <thead class="table-primary">
-                <tr>
-                    <th>Horario</th>
-                    <th>Paciente</th>
-                    <th>Servicio</th>
-                    <th>Estado</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for cita in citas %}
-                <tr>
-                    <td>
-                        <div class="fw-bold">{{ cita.fecha_inicio.strftime('%H:%M') }}</div>
-                        <small class="text-muted">{{ cita.fecha_inicio.strftime('%d/%m/%Y') }}</small>
-                    </td>
-                    <td>
-                        <div>{{ cita.cliente.nombre }}</div>
-                        <small class="text-muted">{{ cita.cliente.telefono }}</small>
-                    </td>
-                    <td>{{ cita.servicio.nombre }}</td>
-                    <td>
-                        <span class="badge 
-                        {% if cita.estado == 'Pendiente' %} bg-warning
-                        {% elif cita.estado == 'Confirmada' %} bg-primary
-                        {% elif cita.estado == 'Cancelada' %} bg-danger
-                        {% elif cita.estado == 'Completada' %} bg-success
-                        {% endif %}">
-                            {{ cita.estado }}
-                        </span>
-                    </td>
-                    <td>
-                        <a href="{{ url_for('ver_paciente', id=cita.cliente_id) }}"
-                            class="btn btn-sm btn-outline-primary">
-                            Ver Expediente
-                        </a>
-                    </td>
-                </tr>
+    <!-- CITAS PARA HOY -->
+    <div class="card shadow rounded-4 border-0 mb-5">
+        <div class="card-header bg-primary text-white py-3">
+            <h5 class="mb-0"><i class="bi bi-star-fill me-2"></i>Citas de Hoy</h5>
+        </div>
+        <div class="card-body">
+            {% if citas_hoy %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>Horario</th>
+                            <th>Paciente</th>
+                            <th>Servicio</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for cita in citas_hoy %}
+                        <tr class="{% if cita.estado == 'Completada' %}table-light opacity-75{% endif %}">
+                            <td>
+                                <div class="fw-bold">{{ cita.fecha_inicio.strftime('%H:%M') }}</div>
+                            </td>
+                            <td>
+                                <div class="fw-bold">{{ cita.cliente.nombre }}</div>
+                                <small class="text-muted">{{ cita.cliente.telefono }}</small>
+                            </td>
+                            <td>{{ cita.servicio.nombre }}</td>
+                            <td>
+                                <span class="badge 
+                                {% if cita.estado == 'Pendiente' %} bg-warning
+                                {% elif cita.estado == 'Confirmada' %} bg-primary
+                                {% elif cita.estado == 'Cancelada' %} bg-danger
+                                {% elif cita.estado == 'Completada' %} bg-success
+                                {% endif %}">
+                                    {{ cita.estado }}
+                                </span>
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    {% if cita.estado != 'Completada' and cita.estado != 'Cancelada' %}
+                                    <a href="{{ url_for('completar_cita_empleado', id=cita.id) }}"
+                                        class="btn btn-success" title="Marcar como Completada">
+                                        ✓ Finalizar
+                                    </a>
+                                    {% endif %}
+                                    <a href="{{ url_for('ver_paciente', id=cita.cliente_id) }}"
+                                        class="btn btn-outline-primary" title="Ver Expediente">
+                                        📁 Expediente
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-center text-muted py-3 mb-0">No tienes citas programadas para hoy.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- MIS CLIENTES (solo los que tienen citas con este especialista) -->
+    <div class="card shadow-sm border-0 rounded-4 mb-4">
+        <div class="card-header bg-success bg-opacity-10 py-3">
+            <h5 class="mb-0"><i class="bi bi-person-hearts me-2"></i>Mis clientes</h5>
+            <p class="text-muted small mb-0 mt-1">Pacientes que has atendido (tienen al menos una cita contigo).
+                Mensajes privados solo entre tú y cada uno.</p>
+        </div>
+        <div class="card-body">
+            {% if mis_clientes %}
+            <div class="list-group list-group-flush">
+                {% for c in mis_clientes %}
+                <div class="list-group-item d-flex justify-content-between align-items-center border-0 px-0">
+                    <div>
+                        <strong>{{ c.nombre }}</strong>
+                        <span class="text-muted small d-block">{{ c.email }}</span>
+                    </div>
+                    <div class="btn-group btn-group-sm">
+                        <a href="{{ url_for('ver_paciente', id=c.id) }}" class="btn btn-outline-primary">Expediente</a>
+                        <a href="{{ url_for('mensajeria', conversacion=c.id) }}" class="btn btn-outline-secondary"><i
+                                class="bi bi-chat-dots"></i> Mensaje</a>
+                    </div>
+                </div>
                 {% endfor %}
-            </tbody>
-        </table>
+            </div>
+            {% else %}
+            <p class="text-muted mb-0">Aún no tienes clientes asignados. Aparecerán cuando tengas citas.</p>
+            {% endif %}
+        </div>
     </div>
-    {% else %}
-    <div class="text-center py-5">
-        <p class="text-muted lead">No tienes citas asignadas para hoy.</p>
+
+    <!-- LISTA GLOBAL DE PACIENTES PARA BÚSQUEDA -->
+    <div class="card shadow-sm border-0 rounded-4 mb-5">
+        <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Todos los Pacientes</h5>
+            <input type="text" id="buscadorPacientes" class="form-control form-control-sm w-auto"
+                placeholder="Buscar por nombre o email...">
+        </div>
+        <div class="card-body">
+            <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                <table class="table table-sm table-hover align-middle" id="tablaPacientes">
+                    <thead class="table-light sticky-top">
+                        <tr>
+                            <th>Nombre</th>
+                            <th>Email</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in todos_pacientes %}
+                        <tr class="paciente-fila">
+                            <td>{{ p.nombre }}</td>
+                            <td>{{ p.email }}</td>
+                            <td>
+                                <a href="{{ url_for('ver_paciente', id=p.id) }}"
+                                    class="btn btn-sm btn-outline-secondary">Ver Expediente</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
-    {% endif %}
+
+    <!-- HISTORIAL / TODAS LAS CITAS -->
+    <div class="card shadow-sm border-0 rounded-4">
+        <div class="card-header bg-white py-3">
+            <h5 class="mb-0">Historial de Mis Citas</h5>
+        </div>
+        <div class="card-body">
+            {% if citas_todas %}
+            <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Paciente</th>
+                            <th>Servicio</th>
+                            <th>Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for cita in citas_todas %}
+                        <tr>
+                            <td>{{ cita.fecha_inicio.strftime('%d/%m/%Y %H:%M') }}</td>
+                            <td>{{ cita.cliente.nombre }}</td>
+                            <td>{{ cita.servicio.nombre }}</td>
+                            <td>{{ cita.estado }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+        </div>
+    </div>
 </div>
+
+<script>
+    // Refrescar cada 30 segundos
+    setInterval(function () {
+        const modalAbierto = document.querySelector('.modal.show');
+        const inputs = document.querySelectorAll('input[type="text"], textarea');
+        let escribiendo = false;
+        inputs.forEach(i => { if (i.value && i === document.activeElement) escribiendo = true; });
+
+        if (!modalAbierto && !escribiendo) {
+            window.location.reload();
+        }
+    }, 30000);
+
+    document.getElementById('buscadorPacientes').addEventListener('keyup', function () {
+        let filtro = this.value.toLowerCase();
+        let filas = document.querySelectorAll('.paciente-fila');
+
+        filas.forEach(fila => {
+            let nombre = fila.children[0].textContent.toLowerCase();
+            let email = fila.children[1].textContent.toLowerCase();
+            if (nombre.includes(filtro) || email.includes(filtro)) {
+                fila.style.display = '';
+            } else {
+                fila.style.display = 'none';
+            }
+        });
+    });
+</script>
 {% endblock %}

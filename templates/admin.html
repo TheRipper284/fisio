@@ -2,8 +2,15 @@
 
 {% block content %}
 <div class="container py-4">
-
-    <h2 class="mb-4">Panel de Administración</h2>
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <div>
+            <a href="{{ url_for('admin_inicio') }}" class="btn btn-outline-secondary btn-sm mb-2">
+                <i class="bi bi-arrow-left me-1"></i> Panel de Admin
+            </a>
+            <h2 class="mb-0">Citas y Servicios</h2>
+            <p class="text-muted small mb-0">Gestiona citas, pagos y servicios del centro.</p>
+        </div>
+    </div>
 
     <!-- ========================= -->
     <!--        CITAS              -->
@@ -36,6 +43,7 @@
                     <th>Servicio</th>
                     <th>Horario</th>
                     <th>Estado</th>
+                    <th>Pago</th>
                     <th>Acciones</th>
                 </tr>
             </thead>
@@ -59,6 +67,26 @@
                 ">
                             {{ cita.estado }}
                         </span>
+                    </td>
+                    <td>
+                        <form action="{{ url_for('actualizar_pago', id=cita.id) }}" method="POST" class="d-inline">
+                            <select name="metodo_pago" class="form-select form-select-sm d-inline-block"
+                                style="width: auto; min-width: 7rem;">
+                                <option value="">— Método —</option>
+                                <option value="Efectivo" {{ 'selected' if cita.metodo_pago == 'Efectivo' else '' }}>
+                                    Efectivo</option>
+                                <option value="Tarjeta" {{ 'selected' if cita.metodo_pago == 'Tarjeta' else '' }}>
+                                    Tarjeta</option>
+                                <option value="Transferencia"
+                                    {{ 'selected' if cita.metodo_pago == 'Transferencia' else '' }}>Transferencia
+                                </option>
+                            </select>
+                            <label class="mb-0 ms-1 small">
+                                <input type="checkbox" name="pagado" value="1" {{ 'checked' if cita.pagado else '' }}>
+                                Pagado
+                            </label>
+                            <button type="submit" class="btn btn-sm btn-outline-primary ms-1">Guardar</button>
+                        </form>
                     </td>
                     <td>
                         <div class="btn-group btn-group-sm">
@@ -92,28 +120,27 @@
     <h4>Gestionar Servicios</h4>
 
     <form action="{{ url_for('agregar_servicio') }}" method="POST" class="row g-3 mb-4">
-
-        <div class="col-md-3">
+        <div class="col-md-2">
             <input type="text" name="nombre" class="form-control" placeholder="Nombre" required>
         </div>
-
         <div class="col-md-2">
             <input type="number" step="0.01" name="precio" class="form-control" placeholder="Precio ($)" required>
         </div>
-
         <div class="col-md-2">
             <input type="number" name="duracion" class="form-control" placeholder="Duración (min)" required>
         </div>
-
         <div class="col-md-2">
             <input type="text" name="categoria" class="form-control" placeholder="Categoría">
         </div>
-
+        <div class="col-md-2">
+            <input type="text" name="descripcion" class="form-control" placeholder="Descripción">
+        </div>
+        <div class="col-12 col-md-2">
+            <input type="text" name="imagen" class="form-control" placeholder="URL imagen (opcional)">
+        </div>
         <div class="col-md-2">
             <button type="submit" class="btn btn-success w-100">Agregar</button>
         </div>
-
-
     </form>
 
     {% if servicios %}
@@ -137,8 +164,10 @@
                     <td>{{ servicio.duracion_minutos }} min</td>
                     <td>
                         <div class="btn-group btn-group-sm">
+                            <a href="{{ url_for('editar_servicio', id=servicio.id) }}"
+                                class="btn btn-outline-primary">Editar</a>
                             <a href="{{ url_for('asignar_especialistas', id=servicio.id) }}"
-                                class="btn btn-outline-primary">Asignar</a>
+                                class="btn btn-outline-secondary">Staff</a>
                             <a href="{{ url_for('eliminar_servicio', id=servicio.id) }}" class="btn btn-outline-danger"
                                 onclick="return confirm('¿Eliminar servicio?')">Eliminar</a>
                         </div>
@@ -154,4 +183,19 @@
     {% endif %}
 
 </div>
+
+<script>
+    // Refrescar la página cada 30 segundos para ver citas nuevas
+    setInterval(function () {
+        // Solo refrescar si no hay modales abiertos o campos con texto
+        const modalAbierto = document.querySelector('.modal.show');
+        const inputs = document.querySelectorAll('input[type="text"], textarea');
+        let escribiendo = false;
+        inputs.forEach(i => { if (i.value && i === document.activeElement) escribiendo = true; });
+
+        if (!modalAbierto && !escribiendo) {
+            window.location.reload();
+        }
+    }, 30000);
+</script>
 {% endblock %}

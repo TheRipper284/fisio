@@ -77,6 +77,10 @@ class Cita(db.Model):
     estado = db.Column(db.String(20), default="Pendiente")
     # Pendiente, Confirmada, Cancelada, Completada
     
+    # --- NUEVOS CAMPOS FINANCIEROS ---
+    pagado = db.Column(db.Boolean, default=False)
+    metodo_pago = db.Column(db.String(50)) # Efectivo, Tarjeta, Transferencia
+    
     fecha_registro = db.Column(db.DateTime, default=datetime.utcnow)
 
     cliente = db.relationship('Usuario', foreign_keys=[cliente_id], backref='citas_como_cliente')
@@ -133,6 +137,28 @@ class Post(db.Model):
     imagen = db.Column(db.String(200))
     fecha_publicacion = db.Column(db.DateTime, default=datetime.utcnow)
 
+class Mensaje(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    emisor_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    receptor_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    contenido = db.Column(db.Text, nullable=False)
+    fecha = db.Column(db.DateTime, default=datetime.utcnow)
+    leido = db.Column(db.Boolean, default=False)
+    
+    emisor = db.relationship('Usuario', foreign_keys=[emisor_id], backref='mensajes_enviados')
+    receptor = db.relationship('Usuario', foreign_keys=[receptor_id], backref='mensajes_recibidos')
+
+class Diagnostico(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    expediente_id = db.Column(db.Integer, db.ForeignKey('expediente.id'), nullable=False)
+    empleado_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    descripcion = db.Column(db.Text, nullable=False)
+    plan_tratamiento = db.Column(db.Text)
+    fecha = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    expediente = db.relationship('Expediente', backref='diagnosticos')
+    especialista = db.relationship('Usuario', backref='diagnosticos_realizados')
+
 
 
 # Crear base de datos e insertar datos iniciales
@@ -161,9 +187,13 @@ with app.app_context():
                 hashed_pw = bcrypt.generate_password_hash("admin123").decode('utf-8')
                 admin = Usuario(nombre="Admin", email="admin@fisio.com", rol="admin", telefono="0000000000", password_hash=hashed_pw)
                 db.session.add(admin)
-            
-            # Sembrar contenido público si está vacío
-            # (Removido por petición: Blog, FAQ, Testimonios)
+
+            # Sembrar FAQ y testimonio de ejemplo si están vacíos
+            if FAQ.query.count() == 0:
+                db.session.add(FAQ(pregunta="¿Necesito orden médica para asistir?", respuesta="No es obligatorio, pero si vienes por rehabilitación post-lesión es recomendable traer estudios o indicaciones de tu médico."))
+                db.session.add(FAQ(pregunta="¿Cuánto dura una sesión?", respuesta="Depende del servicio: entre 45 y 60 minutos. Puedes ver la duración en cada servicio."))
+            if Testimonio.query.count() == 0:
+                db.session.add(Testimonio(nombre_cliente="María G.", contenido="Excelente atención y muy buenos resultados con la rehabilitación.", estrellas=5, activo=True))
 
             db.session.commit()
 
@@ -172,9 +202,34 @@ with app.app_context():
         print(f"Error inicializando DB: {e}")
         # Si hay error de columnas faltantes, se recomienda borrar el archivo .db
 
+@app.route("/favicon.ico")
+def favicon():
+    return "", 204
+
+
 @app.route("/")
 def index():
-    return render_template("index.html")
+    faqs = FAQ.query.all()
+    # Solo testimonios activos
+    testimonios = Testimonio.query.filter_by(activo=True).all()
+    return render_template("index.html", faqs=faqs, testimonios=testimonios)
+
+@app.route("/dashboard")
+@login_required
+def dashboard():
+    if current_user.rol == 'admin':
+        return redirect(url_for('admin_inicio'))
+    elif current_user.rol == 'empleado':
+        return redirect(url_for('empleado_dashboard'))
+    else:
+        return redirect(url_for('cliente_dashboard'))
+
+@app.route("/cliente/citas")
+@login_required
+def cliente_dashboard():
+    # Citas del cliente actual
+    citas = Cita.query.filter_by(cliente_id=current_user.id).order_by(Cita.fecha_inicio.desc()).all()
+    return render_template("cliente_dashboard.html", citas=citas)
 
 @app.context_processor
 def inject_globals():
@@ -198,27 +253,73 @@ def servicio_detalle(id):
     servicio = Servicio.query.get_or_404(id)
     return render_template("servicio_detalle.html", servicio=servicio)
 
+def is_safe_redirect(target):
+    """Acepta solo redirecciones internas (mismo sitio)."""
+    if not target or not target.startswith("/"):
+        return False
+    return not target.startswith("//") and not ":" in target.split("/")[0]
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    next_url = (request.args.get("next") or request.form.get("next") or "").strip()
+    if not is_safe_redirect(next_url):
+        next_url = ""
+
     if current_user.is_authenticated:
-        if current_user.rol == 'admin': return redirect(url_for('admin'))
+        if next_url:
+            return redirect(next_url)
+        if current_user.rol == 'admin': return redirect(url_for('admin_inicio'))
         if current_user.rol == 'empleado': return redirect(url_for('empleado_dashboard'))
         return redirect(url_for('index'))
-        
+
     if request.method == "POST":
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "")
         usuario = Usuario.query.filter_by(email=email).first()
-        
-        if usuario and bcrypt.check_password_hash(usuario.password_hash, password):
+
+        if usuario and usuario.password_hash and bcrypt.check_password_hash(usuario.password_hash, password):
             login_user(usuario)
             flash(f"Bienvenido, {usuario.nombre}.", "success")
-            if usuario.rol == "admin": return redirect(url_for("admin"))
+            if next_url:
+                return redirect(next_url)
+            if usuario.rol == "admin": return redirect(url_for("admin_inicio"))
             if usuario.rol == "empleado": return redirect(url_for("empleado_dashboard"))
             return redirect(url_for("index"))
         else:
             flash("Correo o contraseña incorrectos.", "danger")
-    return render_template("login.html")
+    return render_template("login.html", next=next_url)
+
+@app.route("/registro", methods=["GET", "POST"])
+def registro():
+    if current_user.is_authenticated:
+        return redirect(url_for("index"))
+        
+    if request.method == "POST":
+        nombre = request.form.get("nombre", "").strip()
+        email = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "").strip()
+        telefono = request.form.get("telefono", "").strip()
+
+        if Usuario.query.filter_by(email=email).first():
+            flash("Ese correo ya está registrado.", "warning")
+            return redirect(url_for("registro"))
+            
+        hashed_pw = bcrypt.generate_password_hash(password).decode('utf-8')
+        nuevo_usuario = Usuario(
+            nombre=nombre, 
+            email=email, 
+            password_hash=hashed_pw, 
+            telefono=telefono, 
+            rol='cliente'
+        )
+        db.session.add(nuevo_usuario)
+        db.session.commit()
+        
+        login_user(nuevo_usuario)
+        flash(f"Cuenta creada. ¡Bienvenido, {nombre}!", "success")
+        return redirect(url_for("cliente_dashboard"))
+        
+    return render_template("registro.html")
 
 @app.route("/logout")
 @login_required
@@ -319,8 +420,161 @@ def empleado_dashboard():
         return redirect(url_for("index"))
     
     # Citas asignadas al empleado actual
-    citas = Cita.query.filter_by(empleado_id=current_user.id).order_by(Cita.fecha_inicio.asc()).all()
-    return render_template("empleado_dashboard.html", citas=citas)
+    hoy = date.today()
+    citas_hoy = Cita.query.filter(
+        Cita.empleado_id == current_user.id,
+        db.func.date(Cita.fecha_inicio) == hoy
+    ).order_by(Cita.fecha_inicio.asc()).all()
+    
+    citas_todas = Cita.query.filter_by(empleado_id=current_user.id).order_by(Cita.fecha_inicio.desc()).all()
+
+    # Mis clientes: solo los que tienen al menos una cita con este empleado
+    mis_clientes = Usuario.query.join(Cita, Usuario.id == Cita.cliente_id).filter(
+        Cita.empleado_id == current_user.id
+    ).distinct().order_by(Usuario.nombre).all()
+
+    # Todos los pacientes (para búsqueda / abrir expediente de cualquiera)
+    todos_pacientes = Usuario.query.filter_by(rol='cliente').order_by(Usuario.nombre).all()
+
+    return render_template("empleado_dashboard.html",
+                           citas_hoy=citas_hoy,
+                           citas_todas=citas_todas,
+                           mis_clientes=mis_clientes,
+                           todos_pacientes=todos_pacientes)
+
+@app.route("/empleado/cita/<int:id>/completar")
+@login_required
+def completar_cita_empleado(id):
+    if current_user.rol not in ['empleado', 'admin']: return redirect(url_for("index"))
+    cita = Cita.query.get_or_404(id)
+    if cita.empleado_id != current_user.id and current_user.rol != 'admin':
+        flash("No puedes gestionar esta cita.", "danger")
+        return redirect(url_for("empleado_dashboard"))
+    
+    cita.estado = "Completada"
+    db.session.commit()
+    flash(f"Cita con {cita.cliente.nombre} completada. Por favor agrega una nota de evolución.", "success")
+    return redirect(url_for("ver_paciente", id=cita.cliente_id))
+
+@app.route("/mensajeria")
+@login_required
+def mensajeria():
+    # Contactos: solo con quienes puede chatear (y solo ven mensajes entre los dos)
+    contactos = []
+    if current_user.rol == 'cliente':
+        # Solo especialistas: los que ya tuvieron cita con este cliente + el resto del centro
+        con_cita = Usuario.query.join(Cita, Usuario.id == Cita.empleado_id).filter(
+            Cita.cliente_id == current_user.id
+        ).distinct().all()
+        todos_especialistas = Usuario.query.filter_by(rol='empleado').order_by(Usuario.nombre).all()
+        ids_vistos = {u.id for u in con_cita}
+        contactos = list(con_cita) + [u for u in todos_especialistas if u.id not in ids_vistos]
+    elif current_user.rol == 'empleado':
+        # Empleado solo ve SUS clientes: quienes tienen al menos una cita con él
+        contactos = Usuario.query.join(Cita, Usuario.id == Cita.cliente_id).filter(
+            Cita.empleado_id == current_user.id
+        ).distinct().order_by(Usuario.nombre).all()
+    else:
+        # Admin ve todos los clientes
+        contactos = Usuario.query.filter_by(rol='cliente').order_by(Usuario.nombre).all()
+
+    # Conversación seleccionada: solo mensajes entre current_user y ese contacto
+    conversacion_id = request.args.get("conversacion", type=int)
+    mensajes_conversacion = []
+    contacto_seleccionado = None
+    if conversacion_id:
+        # Validar que el otro usuario está en la lista de contactos permitidos
+        ids_contactos = {c.id for c in contactos}
+        if conversacion_id in ids_contactos:
+            contacto_seleccionado = Usuario.query.get(conversacion_id)
+            mensajes_conversacion = Mensaje.query.filter(
+                db.or_(
+                    db.and_(Mensaje.emisor_id == current_user.id, Mensaje.receptor_id == conversacion_id),
+                    db.and_(Mensaje.emisor_id == conversacion_id, Mensaje.receptor_id == current_user.id)
+                )
+            ).order_by(Mensaje.fecha.asc()).all()
+
+    return render_template(
+        "mensajeria.html",
+        contactos=contactos,
+        mensajes_conversacion=mensajes_conversacion,
+        conversacion_id=conversacion_id,
+        contacto_seleccionado=contacto_seleccionado,
+    )
+
+@app.route("/mensaje/enviar", methods=["POST"])
+@login_required
+def enviar_mensaje():
+    receptor_id = request.form.get("receptor_id")
+    contenido = request.form.get("contenido", "").strip()
+    
+    if receptor_id and contenido:
+        rid = int(receptor_id)
+        nuevo_mensaje = Mensaje(emisor_id=current_user.id, receptor_id=rid, contenido=contenido)
+        db.session.add(nuevo_mensaje)
+        db.session.commit()
+        
+        # Si es una petición AJAX, devolvemos JSON
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return {"status": "success", "mensaje": {
+                "id": nuevo_mensaje.id,
+                "contenido": nuevo_mensaje.contenido,
+                "fecha": nuevo_mensaje.fecha.strftime('%d/%m %H:%M'),
+                "emisor_id": nuevo_mensaje.emisor_id
+            }}
+            
+        flash("Mensaje enviado.", "success")
+        return redirect(url_for("mensajeria", conversacion=rid))
+    else:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return {"status": "error", "message": "Contenido vacío"}, 400
+        flash("Escribe un mensaje y elige un contacto.", "danger")
+    return redirect(url_for("mensajeria"))
+
+@app.route("/api/mensajes/<int:contacto_id>")
+@login_required
+def api_get_mensajes(contacto_id):
+    # Validar que el usuario puede chatear con este contacto (opcional base en rol)
+    mensajes = Mensaje.query.filter(
+        db.or_(
+            db.and_(Mensaje.emisor_id == current_user.id, Mensaje.receptor_id == contacto_id),
+            db.and_(Mensaje.emisor_id == contacto_id, Mensaje.receptor_id == current_user.id)
+        )
+    ).order_by(Mensaje.fecha.asc()).all()
+    
+    return {
+        "mensajes": [
+            {
+                "id": m.id,
+                "contenido": m.contenido,
+                "fecha": m.fecha.strftime('%d/%m %H:%M'),
+                "emisor_id": m.emisor_id
+            } for m in mensajes
+        ]
+    }
+
+@app.route("/paciente/<int:id>/nuevo_diagnostico", methods=["POST"])
+@login_required
+def agregar_diagnostico(id):
+    if current_user.rol not in ['empleado', 'admin']:
+        return redirect(url_for("index"))
+    
+    paciente = Usuario.query.get_or_404(id)
+    descripcion = request.form.get("descripcion")
+    plan = request.form.get("plan_tratamiento")
+    
+    if descripcion:
+        nuevo_diag = Diagnostico(
+            expediente_id=paciente.expediente.id,
+            empleado_id=current_user.id,
+            descripcion=descripcion,
+            plan_tratamiento=plan
+        )
+        db.session.add(nuevo_diag)
+        db.session.commit()
+        flash("Diagnóstico registrado correctamente.", "success")
+    
+    return redirect(url_for("ver_paciente", id=id))
 
 @app.route("/paciente/<int:id>")
 @login_required
@@ -330,12 +584,10 @@ def ver_paciente(id):
         return redirect(url_for("index"))
     
     paciente = Usuario.query.get_or_404(id)
-    # Asegurar que tiene un expediente
     if not paciente.expediente:
-        nuevo_expediente = Expediente(paciente_id=id)
-        db.session.add(nuevo_expediente)
+        db.session.add(Expediente(paciente_id=id))
         db.session.commit()
-    
+        db.session.refresh(paciente)
     return render_template("paciente_detalle.html", paciente=paciente)
 
 @app.route("/paciente/<int:id>/nueva_nota", methods=["POST"])
@@ -359,6 +611,36 @@ def agregar_nota(id):
     
     return redirect(url_for("ver_paciente", id=id))
 
+@app.route("/paciente/<int:id>/editar_expediente", methods=["POST"])
+@login_required
+def editar_expediente(id):
+    if current_user.rol not in ['empleado', 'admin']:
+        return redirect(url_for("index"))
+    
+    paciente = Usuario.query.get_or_404(id)
+    if not paciente.expediente:
+        paciente.expediente = Expediente(paciente_id=id)
+        db.session.add(paciente.expediente)
+
+    paciente.expediente.antecedentes = request.form.get("antecedentes")
+    paciente.expediente.alergias = request.form.get("alergias")
+    db.session.commit()
+    flash("Información del expediente actualizada.", "success")
+    return redirect(url_for("ver_paciente", id=id))
+
+@app.route("/api/especialistas")
+def api_especialistas():
+    servicio_id = request.args.get("servicio_id")
+    if not servicio_id:
+        return {"error": "Falta servicio_id"}, 400
+    
+    servicio = Servicio.query.get(int(servicio_id))
+    if not servicio:
+        return {"error": "Servicio no encontrado"}, 404
+    
+    especialistas = [{"id": e.id, "nombre": e.nombre} for e in servicio.especialistas.all()]
+    return {"especialistas": especialistas}
+
 @app.route("/admin/stats")
 @login_required
 def admin_stats():
@@ -367,24 +649,49 @@ def admin_stats():
     
     total_citas = Cita.query.count()
     citas_completadas = Cita.query.filter_by(estado="Completada").count()
-    servicios_populares = db.session.query(
+    
+    # Ingresos totales (solo citas pagadas)
+    ingresos_totales = db.session.query(db.func.sum(Servicio.precio)).join(Cita).filter(Cita.pagado == True).scalar() or 0
+    ingresos_pendientes = db.session.query(db.func.sum(Servicio.precio)).join(Cita).filter(Cita.pagado == False, Cita.estado != "Cancelada").scalar() or 0
+
+    raw_populares = db.session.query(
         Servicio.nombre, db.func.count(Cita.id)
     ).join(Cita).group_by(Servicio.nombre).all()
+    
+    servicios_populares = []
+    for nombre, count in raw_populares:
+        porcentaje = int((count / total_citas * 100)) if total_citas > 0 else 0
+        servicios_populares.append({
+            'nombre': nombre,
+            'count': count,
+            'porcentaje': porcentaje
+        })
+    
+    eficiencia = int((citas_completadas / total_citas * 100)) if total_citas > 0 else 0
     
     return render_template("admin_stats.html", 
                            total=total_citas, 
                            completadas=citas_completadas,
-                           populares=servicios_populares)
+                           eficiencia=eficiencia,
+                           populares=servicios_populares,
+                           ingresos_totales=ingresos_totales,
+                           ingresos_pendientes=ingresos_pendientes)
 
-def obtener_slots_disponibles(fecha_dt, servicio_id):
-    """Genera slots de tiempo para una fecha y servicio específicos basándose en especialistas asignados."""
+def obtener_slots_disponibles(fecha_dt, servicio_id, empleado_id=None):
+    """Genera slots de tiempo para una fecha y servicio específicos."""
     servicio = Servicio.query.get(servicio_id)
     if not servicio: return []
     
-    # Solo considerar especialistas asignados a este servicio
-    especialistas = servicio.especialistas.all()
-    if not especialistas:
-        return [] # O podrías devolver slots vacíos si no hay nadie asignado
+    # Determinar qué especialistas considerar
+    if empleado_id:
+        especialistas = [Usuario.query.get(empleado_id)]
+        if not especialistas[0] or especialistas[0].rol not in ['empleado', 'admin']:
+            return []
+    else:
+        especialistas = servicio.especialistas.all()
+        
+    if not especialistas or not especialistas[0]:
+        return []
     
     # Horario de atención: 09:00 a 18:00
     inicio_jornada = fecha_dt.replace(hour=9, minute=0, second=0, microsecond=0)
@@ -434,30 +741,35 @@ def obtener_slots_disponibles(fecha_dt, servicio_id):
 def api_slots():
     fecha_str = request.args.get("fecha")
     servicio_id = request.args.get("servicio_id")
+    empleado_id = request.args.get("empleado_id")
+    
     if not (fecha_str and servicio_id):
         return {"error": "Faltan parámetros"}, 400
     try:
         fecha_dt = datetime.strptime(fecha_str, "%Y-%m-%d")
-        slots = obtener_slots_disponibles(fecha_dt, int(servicio_id))
+        slots = obtener_slots_disponibles(fecha_dt, int(servicio_id), 
+                                         int(empleado_id) if empleado_id else None)
         return {"slots": slots}
     except Exception as e:
         return {"error": str(e)}, 500
 
 @app.route("/agendar", methods=["GET", "POST"])
+@login_required
 def agendar():
     servicios_lista = Servicio.query.all()
 
     if request.method == "POST":
         # Si el usuario no está logueado, podríamos pedirle sus datos o usar el email del form
         nombre = request.form.get("nombre", "").strip()
-        email = request.form.get("email", "").strip()
+        email = request.form.get("email", "").strip().lower()
         telefono = request.form.get("telefono", "").strip()
         servicio_id = request.form.get("servicio_id")
+        empleado_id = request.form.get("empleado_id")
         fecha_str = request.form.get("fecha")
-        hora_str = request.form.get("hora")
+        hora_str = request.form.get("hora", "").strip()
 
         if not (servicio_id and fecha_str and hora_str):
-            flash("Faltan datos de la cita.", "warning")
+            flash("Faltan datos de la cita (servicio, fecha y hora).", "warning")
             return redirect(url_for("agendar"))
 
         try:
@@ -465,12 +777,17 @@ def agendar():
             servicio = Servicio.query.get(int(servicio_id))
             fecha_fin = fecha_inicio + timedelta(minutes=servicio.duracion_minutos)
 
-            # Si está logueado, usar su id. Si no, buscar/crear por email
-            if current_user.is_authenticated:
+            # Ya que @login_required asegura que hay un usuario autenticado
+            # Solo permitimos que clientes agenden para sí mismos, 
+            # o que admin/empleados agenden (podrían necesitar especificar un paciente en el futuro, 
+            # pero por ahora simplificamos a usar current_user o los datos del form si es staff)
+            
+            if current_user.rol not in ['admin', 'empleado']:
                 usuario_id = current_user.id
             else:
+                # Si es admin/empleado, buscamos/creamos el paciente basándonos en el form
                 if not (nombre and email):
-                    flash("Debes estar logueado o proporcionar tus datos.", "warning")
+                    flash("Debes proporcionar los datos del paciente.", "warning")
                     return redirect(url_for("agendar"))
                 
                 usuario = Usuario.query.filter_by(email=email).first()
@@ -481,26 +798,44 @@ def agendar():
                 usuario_id = usuario.id
 
             # Verificar disponibilidad real y buscar un especialista libre
-            especialistas = servicio.especialistas.all()
-            if not especialistas:
-                flash("No hay especialistas asignados para este servicio actualmente.", "danger")
-                return redirect(url_for("agendar"))
+            if empleado_id:
+                # Si el usuario eligió a alguien específico, validamos que esté asignado al servicio
+                especialista_libre = Usuario.query.get(int(empleado_id))
+                if not especialista_libre or servicio not in especialista_libre.servicios:
+                    flash("El especialista seleccionado no está disponible para este servicio.", "danger")
+                    return redirect(url_for("agendar"))
+                
+                # Verificar conflicto de horario
+                conflicto = Cita.query.filter(
+                    Cita.empleado_id == especialista_libre.id,
+                    Cita.estado != "Cancelada",
+                    Cita.fecha_inicio < fecha_fin,
+                    Cita.fecha_fin > fecha_inicio
+                ).first()
+                if conflicto:
+                    flash("El especialista ya tiene una cita en ese horario.", "danger")
+                    return redirect(url_for("agendar"))
+            else:
+                # Si no eligió, buscamos cualquiera disponible (lógica anterior)
+                especialistas = servicio.especialistas.all()
+                if not especialistas:
+                    flash("No hay especialistas asignados para este servicio actualmente.", "danger")
+                    return redirect(url_for("agendar"))
 
-            especialista_libre = None
-            # Citas de los especialistas asignados en ese rango horario
-            ids_especialistas = [e.id for e in especialistas]
-            citas_rango = Cita.query.filter(
-                Cita.estado != "Cancelada",
-                Cita.fecha_inicio < fecha_fin,
-                Cita.fecha_fin > fecha_inicio,
-                Cita.empleado_id.in_(ids_especialistas)
-            ).all()
+                especialista_libre = None
+                ids_especialistas = [e.id for e in especialistas]
+                citas_rango = Cita.query.filter(
+                    Cita.estado != "Cancelada",
+                    Cita.fecha_inicio < fecha_fin,
+                    Cita.fecha_fin > fecha_inicio,
+                    Cita.empleado_id.in_(ids_especialistas)
+                ).all()
 
-            for esp in especialistas:
-                ocupado = any(c.empleado_id == esp.id for c in citas_rango)
-                if not ocupado:
-                    especialista_libre = esp
-                    break
+                for esp in especialistas:
+                    ocupado = any(c.empleado_id == esp.id for c in citas_rango)
+                    if not ocupado:
+                        especialista_libre = esp
+                        break
 
             if not especialista_libre:
                 flash("Ese horario se acaba de ocupar. Por favor elige otro.", "danger")
@@ -524,7 +859,73 @@ def agendar():
 
         return redirect(url_for("agendar"))
 
-    return render_template("agendar.html", servicios=servicios_lista)
+    # Citas de hoy para mostrar en la página (todas, no solo las del empleado)
+    citas_hoy = Cita.query.filter(
+        db.func.date(Cita.fecha_inicio) == date.today(),
+        Cita.estado != "Cancelada"
+    ).order_by(Cita.fecha_inicio.asc()).all()
+
+    return render_template("agendar.html", servicios=servicios_lista, citas=citas_hoy)
+
+
+@app.route("/admin/inicio")
+@login_required
+def admin_inicio():
+    """Página de inicio del administrador: solo enlaces claros a cada sección."""
+    if current_user.rol != 'admin':
+        flash("Acceso no autorizado.", "danger")
+        return redirect(url_for("index"))
+    return render_template("admin_inicio.html")
+
+
+@app.route("/admin/limpiar_base_datos", methods=["POST"])
+@login_required
+def limpiar_base_datos():
+    """Borra todos los datos excepto el/los usuario(s) admin. Recrea servicios y contenido inicial."""
+    if current_user.rol != 'admin':
+        flash("Acceso denegado.", "danger")
+        return redirect(url_for("index"))
+    try:
+        # Orden por dependencias de claves foráneas
+        NotaEvolucion.query.delete()
+        Diagnostico.query.delete()
+        Mensaje.query.delete()
+        Cita.query.delete()
+        Expediente.query.delete()
+        db.session.commit()
+
+        # Eliminar todos los usuarios que no sean admin
+        Usuario.query.filter(Usuario.rol != 'admin').delete()
+        db.session.commit()
+
+        # Contenido y servicios
+        FAQ.query.delete()
+        Testimonio.query.delete()
+        Servicio.query.delete()
+        try:
+            Post.query.delete()
+        except Exception:
+            pass
+        db.session.commit()
+
+        # Re-sembrar servicios
+        servicios_iniciales = [
+            Servicio(nombre="Fisioterapia Deportiva", descripcion="Tratamiento de lesiones deportivas y mejora del rendimiento.", precio=500.0, duracion_minutos=60),
+            Servicio(nombre="Masaje Terapéutico", descripcion="Masaje para aliviar tensión muscular y estrés.", precio=400.0, duracion_minutos=45),
+            Servicio(nombre="Rehabilitación Post-Operatoria", descripcion="Cuidado especializado después de una cirugía.", precio=600.0, duracion_minutos=60),
+        ]
+        for s in servicios_iniciales:
+            db.session.add(s)
+        db.session.add(FAQ(pregunta="¿Necesito orden médica para asistir?", respuesta="No es obligatorio, pero si vienes por rehabilitación post-lesión es recomendable traer estudios o indicaciones de tu médico."))
+        db.session.add(FAQ(pregunta="¿Cuánto dura una sesión?", respuesta="Depende del servicio: entre 45 y 60 minutos. Puedes ver la duración en cada servicio."))
+        db.session.add(Testimonio(nombre_cliente="María G.", contenido="Excelente atención y muy buenos resultados con la rehabilitación.", estrellas=5, activo=True))
+        db.session.commit()
+
+        flash("Base de datos limpiada. Solo se mantuvo el/los administrador(es). Servicios y contenido inicial restaurados.", "success")
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Error al limpiar: {str(e)}", "danger")
+    return redirect(url_for("admin_inicio"))
 
 
 @app.route("/admin")
@@ -559,6 +960,110 @@ def actualizar_cita_status(id, nuevo_estado):
         flash(f"Cita #{id} marcada como {nuevo_estado}.", "info")
     return redirect(url_for("admin"))
 
+@app.route("/admin/cita/<int:id>/toggle_pago")
+@login_required
+def toggle_pago(id):
+    if current_user.rol != 'admin': return redirect(url_for("index"))
+    cita = Cita.query.get_or_404(id)
+    cita.pagado = not cita.pagado
+    db.session.commit()
+    return redirect(url_for("admin"))
+
+@app.route("/admin/cita/<int:id>/pago", methods=["POST"])
+@login_required
+def actualizar_pago(id):
+    if current_user.rol != 'admin': return redirect(url_for("index"))
+    cita = Cita.query.get_or_404(id)
+    cita.pagado = request.form.get("pagado") == "1"
+    cita.metodo_pago = request.form.get("metodo_pago", "").strip() or None
+    db.session.commit()
+    flash("Pago actualizado.", "info")
+    return redirect(url_for("admin"))
+
+@app.route("/admin/pacientes")
+@login_required
+def gestion_pacientes():
+    if current_user.rol != 'admin': return redirect(url_for("index"))
+    query = request.args.get("q", "").strip()
+    if query:
+        pacientes = Usuario.query.filter(
+            Usuario.rol == 'cliente',
+            (Usuario.nombre.contains(query)) | (Usuario.email.contains(query)) | (Usuario.telefono.contains(query))
+        ).all()
+    else:
+        pacientes = Usuario.query.filter_by(rol='cliente').all()
+    return render_template("admin_pacientes.html", pacientes=pacientes, search_query=query)
+
+@app.route("/admin/servicio/<int:id>/editar", methods=["GET", "POST"])
+@login_required
+def editar_servicio(id):
+    if current_user.rol != 'admin': return redirect(url_for("index"))
+    servicio = Servicio.query.get_or_404(id)
+    if request.method == "POST":
+        servicio.nombre = request.form.get("nombre")
+        servicio.precio = float(request.form.get("precio"))
+        servicio.duracion_minutos = int(request.form.get("duracion"))
+        servicio.descripcion = request.form.get("descripcion")
+        servicio.categoria = request.form.get("categoria")
+        servicio.imagen = request.form.get("imagen", "").strip() or None
+        db.session.commit()
+        flash(f"Servicio {servicio.nombre} actualizado.", "success")
+        return redirect(url_for("admin"))
+    return render_template("admin_editar_servicio.html", servicio=servicio)
+
+@app.route("/admin/contenido")
+@login_required
+def gestion_contenido():
+    if current_user.rol != 'admin': return redirect(url_for("index"))
+    faqs = FAQ.query.all()
+    testimonios = Testimonio.query.all()
+    return render_template("admin_contenido.html", faqs=faqs, testimonios=testimonios)
+
+@app.route("/admin/faq/nueva", methods=["POST"])
+@login_required
+def nueva_faq():
+    if current_user.rol != 'admin': return redirect(url_for("index"))
+    pregunta = request.form.get("pregunta")
+    respuesta = request.form.get("respuesta")
+    if pregunta and respuesta:
+        faq = FAQ(pregunta=pregunta, respuesta=respuesta)
+        db.session.add(faq)
+        db.session.commit()
+        flash("FAQ agregada.", "success")
+    return redirect(url_for("gestion_contenido"))
+
+@app.route("/admin/faq/<int:id>/eliminar")
+@login_required
+def eliminar_faq(id):
+    if current_user.rol != 'admin': return redirect(url_for("index"))
+    faq = FAQ.query.get_or_404(id)
+    db.session.delete(faq)
+    db.session.commit()
+    flash("FAQ eliminada.", "info")
+    return redirect(url_for("gestion_contenido"))
+
+@app.route("/admin/calendario")
+@login_required
+def admin_calendario():
+    if current_user.rol != 'admin': return redirect(url_for("index"))
+    return render_template("admin_calendario.html")
+
+@app.route("/api/citas_calendario")
+@login_required
+def api_citas_calendario():
+    if current_user.rol != 'admin': return {"error": "Unauthorized"}, 403
+    citas = Cita.query.filter(Cita.estado != "Cancelada").all()
+    eventos = []
+    for c in citas:
+        eventos.append({
+            'id': c.id,
+            'title': f"{c.cliente.nombre} - {c.servicio.nombre}",
+            'start': c.fecha_inicio.isoformat(),
+            'end': c.fecha_fin.isoformat(),
+            'color': '#ffc107' if c.estado == 'Pendiente' else '#0d6efd' if c.estado == 'Confirmada' else '#198754'
+        })
+    return {"eventos": eventos}
+
 @app.route("/admin/agregar_servicio", methods=["POST"])
 @login_required
 def agregar_servicio():
@@ -569,7 +1074,8 @@ def agregar_servicio():
     duracion = request.form.get("duracion")
     descripcion = request.form.get("descripcion", "Sin descripción").strip()
     categoria = request.form.get("categoria", "").strip()
-    
+    imagen = request.form.get("imagen", "").strip() or None
+
     if nombre and precio and duracion:
         try:
             nuevo_servicio = Servicio(
@@ -577,7 +1083,8 @@ def agregar_servicio():
                 precio=float(precio),
                 duracion_minutos=int(duracion),
                 descripcion=descripcion,
-                categoria=categoria
+                categoria=categoria,
+                imagen=imagen
             )
 
             db.session.add(nuevo_servicio)
@@ -591,7 +1098,11 @@ def agregar_servicio():
     return redirect(url_for("admin"))
 
 @app.route("/admin/eliminar_servicio/<int:id>")
+@login_required
 def eliminar_servicio(id):
+    if current_user.rol != 'admin':
+        flash("Acceso denegado.", "danger")
+        return redirect(url_for("index"))
     servicio = Servicio.query.get_or_404(id)
     try:
         db.session.delete(servicio)
@@ -605,9 +1116,18 @@ def eliminar_servicio(id):
 @app.errorhandler(500)
 def internal_error(error):
     import traceback
-    with open("global_error.txt", "w") as f:
-        f.write(traceback.format_exc())
-    return "500 Internal Error - Check global_error.txt", 500
+    error_path = os.path.join(basedir, "global_error.txt")
+    try:
+        with open(error_path, "w", encoding="utf-8") as f:
+            f.write(traceback.format_exc())
+    except OSError:
+        pass
+    return (
+        "<h1>Error interno del servidor</h1>"
+        "<p>Se ha registrado el error. Revisa global_error.txt en la carpeta de la aplicación.</p>",
+        500,
+        {"Content-Type": "text/html; charset=utf-8"},
+    )
 
 if __name__ == "__main__":
     app.run(debug=True)

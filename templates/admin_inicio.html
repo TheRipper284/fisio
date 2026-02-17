@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-4">
+    <h1 class="mb-2">Panel de Administración</h1>
+    <p class="text-muted mb-4">Elige qué quieres gestionar. Solo el administrador ve esta página.</p>
+
+    <div class="row g-4">
+        <div class="col-md-6 col-lg-4">
+            <a href="{{ url_for('admin') }}" class="text-decoration-none">
+                <div class="card border-0 shadow-sm h-100 hover-card">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-2">
+                            <span class="bg-primary bg-opacity-10 text-primary rounded-3 p-2 me-3">
+                                <i class="bi bi-calendar-check fs-4"></i>
+                            </span>
+                            <h5 class="mb-0">Citas y Servicios</h5>
+                        </div>
+                        <p class="text-muted small mb-0">Ver todas las citas, confirmar, cancelar, marcar pagos. Agregar o editar servicios y asignar especialistas.</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <div class="col-md-6 col-lg-4">
+            <a href="{{ url_for('admin_calendario') }}" class="text-decoration-none">
+                <div class="card border-0 shadow-sm h-100 hover-card">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-2">
+                            <span class="bg-success bg-opacity-10 text-success rounded-3 p-2 me-3">
+                                <i class="bi bi-calendar3 fs-4"></i>
+                            </span>
+                            <h5 class="mb-0">Calendario</h5>
+                        </div>
+                        <p class="text-muted small mb-0">Vista en calendario de todas las citas del centro.</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <div class="col-md-6 col-lg-4">
+            <a href="{{ url_for('gestion_pacientes') }}" class="text-decoration-none">
+                <div class="card border-0 shadow-sm h-100 hover-card">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-2">
+                            <span class="bg-info bg-opacity-10 text-info rounded-3 p-2 me-3">
+                                <i class="bi bi-people fs-4"></i>
+                            </span>
+                            <h5 class="mb-0">Pacientes</h5>
+                        </div>
+                        <p class="text-muted small mb-0">Listado de clientes/pacientes del centro. Buscar y ver expedientes.</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <div class="col-md-6 col-lg-4">
+            <a href="{{ url_for('gestion_usuarios') }}" class="text-decoration-none">
+                <div class="card border-0 shadow-sm h-100 hover-card">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-2">
+                            <span class="bg-warning bg-opacity-10 text-warning rounded-3 p-2 me-3">
+                                <i class="bi bi-person-badge fs-4"></i>
+                            </span>
+                            <h5 class="mb-0">Personal (especialistas)</h5>
+                        </div>
+                        <p class="text-muted small mb-0">Crear y editar empleados (fisioterapeutas). Solo administrador.</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <div class="col-md-6 col-lg-4">
+            <a href="{{ url_for('gestion_contenido') }}" class="text-decoration-none">
+                <div class="card border-0 shadow-sm h-100 hover-card">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-2">
+                            <span class="bg-secondary bg-opacity-10 text-secondary rounded-3 p-2 me-3">
+                                <i class="bi bi-file-text fs-4"></i>
+                            </span>
+                            <h5 class="mb-0">Contenido del sitio</h5>
+                        </div>
+                        <p class="text-muted small mb-0">FAQs y testimonios que se muestran en la página de inicio.</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <div class="col-md-6 col-lg-4">
+            <a href="{{ url_for('admin_stats') }}" class="text-decoration-none">
+                <div class="card border-0 shadow-sm h-100 hover-card">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-2">
+                            <span class="bg-danger bg-opacity-10 text-danger rounded-3 p-2 me-3">
+                                <i class="bi bi-graph-up fs-4"></i>
+                            </span>
+                            <h5 class="mb-0">Estadísticas</h5>
+                        </div>
+                        <p class="text-muted small mb-0">Citas completadas, ingresos, servicios más demandados.</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <div class="col-12 mt-4">
+            <div class="card border-danger border-2">
+                <div class="card-body">
+                    <h5 class="text-danger"><i class="bi bi-database-dash me-2"></i>Limpiar base de datos</h5>
+                    <p class="text-muted small mb-3">Elimina todos los datos (citas, mensajes, pacientes, empleados, contenido) y deja solo al administrador. Se restauran servicios y FAQs de ejemplo.</p>
+                    <form action="{{ url_for('limpiar_base_datos') }}" method="POST" class="d-inline" onsubmit="return confirm('¿Estás seguro? Se borrarán TODOS los datos excepto tu usuario admin. Esta acción no se puede deshacer.');">
+                        <button type="submit" class="btn btn-outline-danger">Limpiar todo (mantener solo admin)</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.hover-card { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+.hover-card:hover { transform: translateY(-2px); box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.1) !important; }
+</style>
+{% endblock %}

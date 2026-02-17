@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-4">
+    <a href="{{ url_for('admin_inicio') }}" class="btn btn-outline-secondary btn-sm mb-2"><i class="bi bi-arrow-left me-1"></i> Panel de Admin</a>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0">Pacientes</h2>
+        <form class="d-flex" style="max-width: 400px;">
+            <input class="form-control me-2" type="search" name="q" placeholder="Nombre, email o teléfono..."
+                value="{{ search_query or '' }}">
+            <button class="btn btn-primary" type="submit">Buscar</button>
+        </form>
+    </div>
+
+    <div class="card shadow-sm border-0 rounded-4">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Paciente</th>
+                            <th>Contacto</th>
+                            <th>Historial</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for paciente in pacientes %}
+                        <tr>
+                            <td>
+                                <div class="fw-bold">{{ paciente.nombre }}</div>
+                                <small class="text-muted">ID: {{ paciente.id }}</small>
+                            </td>
+                            <td>
+                                <div><i class="bi bi-envelope"></i> {{ paciente.email }}</div>
+                                <div><i class="bi bi-telephone"></i> {{ paciente.telefono or 'N/A' }}</div>
+                            </td>
+                            <td>
+                                <span class="badge bg-secondary">{{ paciente.citas_como_cliente|length }} Citas</span>
+                            </td>
+                            <td>
+                                <a href="{{ url_for('ver_paciente', id=paciente.id) }}"
+                                    class="btn btn-sm btn-outline-primary">
+                                    Ver Expediente
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if not pacientes %}
+            <div class="text-center py-4">
+                <p class="text-muted">No se encontraron pacientes.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

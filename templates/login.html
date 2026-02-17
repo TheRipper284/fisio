@@ -10,6 +10,9 @@
                 </div>
                 <div class="card-body p-5">
                     <form method="POST">
+                        {% if next %}
+                        <input type="hidden" name="next" value="{{ next }}">
+                        {% endif %}
                         <div class="form-group mb-3">
                             <label class="small mb-1" for="email">Correo Electrónico</label>
                             <input class="form-control py-4" id="email" name="email" type="email"
@@ -26,7 +29,9 @@
                     </form>
                 </div>
                 <div class="card-footer text-center py-3">
-                    <div class="small text-muted">Centro de Fisioterapia - Acceso Privado</div>
+                    <div class="small"><a href="{{ url_for('registro') }}">¿No tienes cuenta? ¡Regístrate aquí!</a>
+                    </div>
+                    <div class="small text-muted mt-2">Centro de Fisioterapia - Acceso Privado</div>
                 </div>
 
             </div>

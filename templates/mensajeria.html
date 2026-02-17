@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row">
+        <!-- Sidebar - Contactos -->
+        <div class="col-md-4 mb-4">
+            <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0"><i class="bi bi-people me-2"></i>Contactos</h5>
+                </div>
+                <div class="card-body">
+                    {% if contactos %}
+                    <div class="list-group list-group-flush">
+                        {% for contacto in contactos %}
+                        <a href="{{ url_for('mensajeria', conversacion=contacto.id) }}"
+                            class="list-group-item list-group-item-action border-0 px-0 d-flex align-items-center mb-2 rounded-3 {{ 'active' if conversacion_id == contacto.id else '' }}">
+                            <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3"
+                                style="width: 40px; height: 40px;">
+                                {{ contacto.nombre[0]|upper }}
+                            </div>
+                            <div>
+                                <h6 class="mb-0">{{ contacto.nombre }}</h6>
+                                <small
+                                    class="{{ 'text-white-50' if conversacion_id == contacto.id else 'text-muted' }}">{{ contacto.rol|capitalize }}</small>
+                            </div>
+                        </a>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted small">
+                        {% if current_user.rol == 'cliente' %}
+                        No hay especialistas cargados. Pide al administrador que registre personal.
+                        {% else %}
+                        No tienes clientes todavía. Aparecerán cuando tengas citas asignadas.
+                        {% endif %}
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Chat: solo conversación con el contacto seleccionado -->
+        <div class="col-md-8">
+            <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0">
+                        {% if contacto_seleccionado %}
+                        Chat con <span class="text-primary">{{ contacto_seleccionado.nombre }}</span>
+                        {% else %}
+                        <span class="text-muted">Selecciona un contacto para ver la conversación</span>
+                        {% endif %}
+                    </h5>
+                </div>
+
+                <div class="card-body bg-light overflow-auto p-4" style="min-height: 350px; max-height: 450px;"
+                    id="chat-box">
+                    {% if contacto_seleccionado %}
+                    {% for m in mensajes_conversacion %}
+                    <div class="d-flex mb-3 {{ 'justify-content-end' if m.emisor_id == current_user.id else '' }}">
+                        <div class="p-3 rounded-4 shadow-sm {{ 'bg-primary text-white' if m.emisor_id == current_user.id else 'bg-white' }}"
+                            style="max-width: 80%;">
+                            <p class="mb-1">{{ m.contenido }}</p>
+                            <small class="{{ 'text-white-50' if m.emisor_id == current_user.id else 'text-muted' }}"
+                                style="font-size: 0.7rem;">
+                                {{ m.fecha.strftime('%d/%m %H:%M') }}
+                                {% if m.emisor_id == current_user.id %} (tú){% else %}
+                                ({{ m.emisor.nombre }}){% endif %}
+                            </small>
+                        </div>
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center py-4">Aún no hay mensajes. Escribe el primero.</p>
+                    {% endfor %}
+                    {% else %}
+                    <p class="text-muted text-center py-5">Elige un contacto a la izquierda para ver y enviar mensajes.
+                        Solo tú y esa persona pueden ver esta conversación.</p>
+                    {% endif %}
+                </div>
+
+                <div class="card-footer bg-white border-0 p-3">
+                    {% if contacto_seleccionado %}
+                    <form action="{{ url_for('enviar_mensaje') }}" method="POST">
+                        <input type="hidden" name="receptor_id" value="{{ contacto_seleccionado.id }}">
+                        <div class="input-group">
+                            <input type="text" name="contenido" class="form-control border-0 bg-light px-3"
+                                placeholder="Escribe tu mensaje..." required>
+                            <button class="btn btn-primary rounded-end px-4" type="submit">
+                                <i class="bi bi-send"></i> Enviar
+                            </button>
+                        </div>
+                    </form>
+                    {% else %}
+                    <p class="text-muted small mb-0">Selecciona un contacto para poder enviar mensajes.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const chatBox = document.getElementById('chat-box');
+    const messageForm = document.querySelector('form[action="{{ url_for("enviar_mensaje") }}"]');
+    const messageInput = document.querySelector('input[name="contenido"]');
+    const currentUserId = parseInt("{{ current_user.id }}") || 0;
+    const contactoId = parseInt("{{ conversacion_id or 0 }}") || 0;
+    let lastMessageCount = parseInt("{{ mensajes_conversacion|length }}") || 0;
+
+    function scrollChat() {
+        if (chatBox) chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    // Scroll al inicio
+    scrollChat();
+
+    // Enviar mensaje por AJAX
+    if (messageForm) {
+        messageForm.addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const contenido = messageInput.value.trim();
+            if (!contenido) return;
+
+            const formData = new FormData();
+            formData.append('receptor_id', contactoId);
+            formData.append('contenido', contenido);
+
+            try {
+                const response = await fetch("{{ url_for('enviar_mensaje') }}", {
+                    method: 'POST',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    body: formData
+                });
+                const data = await response.json();
+                if (data.status === 'success') {
+                    messageInput.value = '';
+                    await fetchMensajes(); // Refrescar chat inmediatamente
+                }
+            } catch (err) {
+                console.error("Error enviando mensaje:", err);
+            }
+        });
+    }
+
+    // Polling para nuevos mensajes
+    async function fetchMensajes() {
+        if (!contactoId) return;
+        try {
+            const response = await fetch(`/api/mensajes/${contactoId}`);
+            const data = await response.json();
+
+            if (data.mensajes && data.mensajes.length > lastMessageCount) {
+                const newMessages = data.mensajes.slice(lastMessageCount);
+                newMessages.forEach(m => {
+                    const isMe = m.emisor_id === currentUserId;
+                    const div = document.createElement('div');
+                    div.className = `d-flex mb-3 ${isMe ? 'justify-content-end' : ''}`;
+                    div.innerHTML = `
+                        <div class="p-3 rounded-4 shadow-sm ${isMe ? 'bg-primary text-white' : 'bg-white'}" style="max-width: 80%;">
+                            <p class="mb-1">${m.contenido}</p>
+                            <small class="${isMe ? 'text-white-50' : 'text-muted'}" style="font-size: 0.7rem;">
+                                ${m.fecha} ${isMe ? '(tú)' : ''}
+                            </small>
+                        </div>
+                    `;
+                    chatBox.appendChild(div);
+                });
+                lastMessageCount = data.mensajes.length;
+                scrollChat();
+            }
+        } catch (err) {
+            console.error("Error al actualizar mensajes:", err);
+        }
+    }
+
+    if (contactoId) {
+        setInterval(fetchMensajes, 3000); // Cada 3 segundos
+    }
+</script>
+{% endblock %}

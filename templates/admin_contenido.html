@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-4">
+    <a href="{{ url_for('admin_inicio') }}" class="btn btn-outline-secondary btn-sm mb-2"><i class="bi bi-arrow-left me-1"></i> Panel de Admin</a>
+    <h2 class="mb-4">Contenido del sitio (FAQ y testimonios)</h2>
+
+    <div class="row">
+        <!-- FAQs -->
+        <div class="col-md-6 mb-4">
+            <div class="card shadow-sm border-0 rounded-4">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Preguntas Frecuentes (FAQ)</h5>
+                    <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#modalFAQ">+
+                        Nueva</button>
+                </div>
+                <div class="card-body">
+                    <div class="list-group list-group-flush">
+                        {% for faq in faqs %}
+                        <div class="list-group-item px-0">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <h6 class="mb-1">{{ faq.pregunta }}</h6>
+                                    <p class="text-muted small mb-0">{{ faq.respuesta }}</p>
+                                </div>
+                                <a href="{{ url_for('eliminar_faq', id=faq.id) }}" class="text-danger ms-2"
+                                    onclick="return confirm('¿Eliminar FAQ?')">
+                                    <i class="bi bi-trash"></i>
+                                </a>
+                            </div>
+                        </div>
+                        {% endfor %}
+                        {% if not faqs %}
+                        <p class="text-muted text-center py-3">No hay FAQs registradas.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Testimonios -->
+        <div class="col-md-6 mb-4">
+            <div class="card shadow-sm border-0 rounded-4">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0">Testimonios de Clientes</h5>
+                </div>
+                <div class="card-body">
+                    {% for t in testimonios %}
+                    <div class="border-bottom mb-3 pb-3">
+                        <div class="d-flex justify-content-between">
+                            <span class="fw-bold">{{ t.nombre_cliente }}</span>
+                            <span class="text-warning">
+                                {% for i in range(t.estrellas) %}★{% endfor %}
+                            </span>
+                        </div>
+                        <p class="small text-muted mb-0 italic">"{{ t.contenido }}"</p>
+                    </div>
+                    {% endfor %}
+                    {% if not testimonios %}
+                    <p class="text-muted text-center py-3">No hay testimonios registrados aún.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Nueva FAQ -->
+<div class="modal fade" id="modalFAQ" tabindex="-1">
+    <div class="modal-dialog">
+        <form action="{{ url_for('nueva_faq') }}" method="POST" class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Nueva Pregunta Frecuente</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Pregunta</label>
+                    <input type="text" name="pregunta" class="form-control" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Respuesta</label>
+                    <textarea name="respuesta" class="form-control" rows="3" required></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn btn-primary">Guardar</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

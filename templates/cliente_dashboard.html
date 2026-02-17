@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h2>Mis Citas</h2>
+            <p class="text-muted">Hola, {{ current_user.nombre }}. Aquí puedes revisar el detalle de tus sesiones.</p>
+        </div>
+        <div class="col-md-4 text-md-end">
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalAgendar">
+                + Agendar Nueva Cita
+            </button>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Citas -->
+        <div class="col-md-8 mb-4">
+            <div class="card shadow-sm border-0 rounded-4 h-100">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0">Historial de Citas</h5>
+                </div>
+                <div class="card-body">
+                    {% if citas %}
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Servicio</th>
+                                    <th>Especialista</th>
+                                    <th>Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for cita in citas %}
+                                <tr>
+                                    <td>
+                                        <div class="fw-bold">{{ cita.fecha_inicio.strftime('%d/%m/%Y') }}</div>
+                                        <small>{{ cita.fecha_inicio.strftime('%H:%M') }}</small>
+                                    </td>
+                                    <td>{{ cita.servicio.nombre }}</td>
+                                    <td>{{ cita.empleado.nombre }}</td>
+                                    <td>
+                                        <span class="badge 
+                                        {% if cita.estado == 'Pendiente' %} bg-warning
+                                        {% elif cita.estado == 'Confirmada' %} bg-primary
+                                        {% elif cita.estado == 'Cancelada' %} bg-danger
+                                        {% elif cita.estado == 'Completada' %} bg-success
+                                        {% endif %}">
+                                            {{ cita.estado }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="bi bi-calendar-x display-4 text-muted"></i>
+                        <p class="mt-3 lead text-muted small">Aún no tienes citas registradas.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-md-4">
+            <!-- Diagnósticos -->
+            <div class="card shadow-sm border-0 rounded-4 mb-4">
+                <div class="card-header bg-success text-white py-3">
+                    <h5 class="mb-0 small"><i class="bi bi-clipboard-pulse me-2"></i>Mis Diagnósticos</h5>
+                </div>
+                <div class="card-body">
+                    {% if current_user.expediente and current_user.expediente.diagnosticos %}
+                    {% for diag in current_user.expediente.diagnosticos|sort(attribute='fecha', reverse=True) %}
+                    <div class="p-3 border rounded-3 mb-2 bg-light">
+                        <h6 class="mb-1 small fw-bold">{{ diag.descripcion }}</h6>
+                        <p class="small text-muted mb-0" style="font-size: 0.7rem;">Plan:
+                            {{ diag.plan_tratamiento or 'Seguir indicaciones' }}</p>
+                        <hr class="my-2">
+                        <small class="text-muted" style="font-size: 0.65rem;">{{ diag.fecha.strftime('%d/%m/%Y') }} -
+                            {{ diag.especialista.nombre }}</small>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <p class="text-muted small">Tus diagnósticos oficiales aparecerán aquí después de tu valoración.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Centro de Mensajes -->
+            <div class="card shadow-sm border-0 rounded-4">
+                <div class="card-body p-4 text-center">
+                    <i class="bi bi-chat-dots-fill display-5 text-primary mb-3"></i>
+                    <h5>¿Tienes dudas?</h5>
+                    <p class="text-muted small">Escríbele directamente a tu especialista.</p>
+                    <a href="{{ url_for('mensajeria') }}" class="btn btn-primary w-100 rounded-pill py-2">
+                        Abrir Mensajería
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Refrescar cada 30 segundos
+    setInterval(function () {
+        // En cliente_dashboard no suele haber formularios críticos, pero validamos igual
+        if (!document.querySelector('.modal.show') && !document.activeElement.matches('input, textarea')) {
+            window.location.reload();
+        }
+    }, 30000);
+</script>
+{% endblock %}
