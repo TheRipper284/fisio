@@ -98,6 +98,12 @@
                                 class="btn btn-outline-danger" title="Cancelar">✕</a>
                             <a href="{{ url_for('ver_paciente', id=cita.cliente_id) }}" class="btn btn-info text-white"
                                 title="Ver Expediente">📁</a>
+                            {% if cita.pagado %}
+                            <a href="{{ url_for('generar_recibo', id=cita.id) }}" class="btn btn-dark"
+                                title="Generar Recibo">
+                                <i class="bi bi-file-earmark-pdf"></i>
+                            </a>
+                            {% endif %}
                         </div>
 
                     </td>

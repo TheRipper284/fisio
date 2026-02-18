@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow border-0 rounded-4">
+                <div class="card-header bg-success text-white p-4 rounded-top-4">
+                    <h3 class="mb-0">Mi Perfil</h3>
+                    <p class="mb-0 opcity-75">Gestiona tu información personal y cuenta.</p>
+                </div>
+                <div class="card-body p-4">
+                    <form action="{{ url_for('perfil') }}" method="POST" enctype="multipart/form-data">
+                        <div class="row mb-4 align-items-center">
+                            <div class="col-auto">
+                                {% if current_user.foto_perfil %}
+                                <img src="{{ url_for('static', filename='uploads/' + current_user.foto_perfil) }}"
+                                    class="rounded-circle shadow-sm"
+                                    style="width: 100px; height: 100px; object-fit: cover;" alt="Perfil">
+                                {% else %}
+                                <div class="bg-light rounded-circle d-flex align-items-center justify-content-center shadow-sm"
+                                    style="width: 100px; height: 100px;">
+                                    <i class="bi bi-person text-secondary" style="font-size: 3rem;"></i>
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="col">
+                                <label for="foto" class="form-label fw-bold">Cambiar foto de perfil</label>
+                                <input type="file" class="form-control" name="foto" id="foto" accept="image/*">
+                                <div class="form-text">Formatos permitidos: PNG, JPG, JPEG. Máx 16MB.</div>
+                            </div>
+                        </div>
+
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="nombre" class="form-label fw-bold">Nombre completo</label>
+                                <input type="text" class="form-control" name="nombre" id="nombre"
+                                    value="{{ current_user.nombre }}" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="email" class="form-label fw-bold">Correo electrónico</label>
+                                <input type="email" class="form-control bg-light" value="{{ current_user.email }}"
+                                    readonly disabled>
+                                <div class="form-text">El correo no puede ser modificado.</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="telefono" class="form-label fw-bold">Teléfono</label>
+                                <input type="tel" class="form-control" name="telefono" id="telefono"
+                                    value="{{ current_user.telefono }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="rol" class="form-label fw-bold">Rol en el sistema</label>
+                                <input type="text" class="form-control bg-light"
+                                    value="{{ current_user.rol|capitalize }}" readonly disabled>
+                            </div>
+
+                            <hr class="my-4">
+
+                            <div class="col-12">
+                                <h5 class="fw-bold mb-3">Seguridad</h5>
+                            </div>
+
+                            <div class="col-md-12">
+                                <label for="password" class="form-label fw-bold">Nueva contraseña</label>
+                                <input type="password" class="form-control" name="password" id="password"
+                                    placeholder="Dejar en blanco para no cambiar">
+                                <div class="form-text">Si deseas cambiar tu contraseña, ingrésala aquí.</div>
+                            </div>
+                        </div>
+
+                        <div class="mt-4 d-flex justify-content-end gap-2">
+                            <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary px-4">Cancelar</a>
+                            <button type="submit" class="btn btn-success px-4">Guardar Cambios</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

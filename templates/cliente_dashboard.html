@@ -31,6 +31,7 @@
                                     <th>Servicio</th>
                                     <th>Especialista</th>
                                     <th>Estado</th>
+                                    <th>Recibo</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -41,7 +42,7 @@
                                         <small>{{ cita.fecha_inicio.strftime('%H:%M') }}</small>
                                     </td>
                                     <td>{{ cita.servicio.nombre }}</td>
-                                    <td>{{ cita.empleado.nombre }}</td>
+                                    <td>{{ cita.empleado.nombre if cita.empleado else 'No asignado' }}</td>
                                     <td>
                                         <span class="badge 
                                         {% if cita.estado == 'Pendiente' %} bg-warning
@@ -51,6 +52,16 @@
                                         {% endif %}">
                                             {{ cita.estado }}
                                         </span>
+                                    </td>
+                                    <td>
+                                        {% if cita.pagado %}
+                                        <a href="{{ url_for('generar_recibo', id=cita.id) }}"
+                                            class="btn btn-sm btn-outline-dark">
+                                            <i class="bi bi-file-earmark-pdf"></i> PDF
+                                        </a>
+                                        {% else %}
+                                        <span class="text-muted small">Pendiente</span>
+                                        {% endif %}
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -75,15 +86,15 @@
                     <h5 class="mb-0 small"><i class="bi bi-clipboard-pulse me-2"></i>Mis Diagnósticos</h5>
                 </div>
                 <div class="card-body">
-                    {% if current_user.expediente and current_user.expediente.diagnosticos %}
-                    {% for diag in current_user.expediente.diagnosticos|sort(attribute='fecha', reverse=True) %}
+                    {% if diagnosticos %}
+                    {% for diag in diagnosticos %}
                     <div class="p-3 border rounded-3 mb-2 bg-light">
                         <h6 class="mb-1 small fw-bold">{{ diag.descripcion }}</h6>
                         <p class="small text-muted mb-0" style="font-size: 0.7rem;">Plan:
                             {{ diag.plan_tratamiento or 'Seguir indicaciones' }}</p>
                         <hr class="my-2">
-                        <small class="text-muted" style="font-size: 0.65rem;">{{ diag.fecha.strftime('%d/%m/%Y') }} -
-                            {{ diag.especialista.nombre }}</small>
+                        <small class="text-muted" style="font-size: 0.65rem;">{{ diag.fecha.strftime('%d/%m/%Y') if diag.fecha else 'N/A' }} -
+                            {{ diag.especialista.nombre if diag.especialista else 'N/A' }}</small>
                     </div>
                     {% endfor %}
                     {% else %}

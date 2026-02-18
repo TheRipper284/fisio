@@ -1,10 +1,16 @@
 import os
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, date, timedelta 
 from flask_migrate import Migrate
 from flask_bcrypt import Bcrypt
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from flask_mail import Mail, Message
+from werkzeug.utils import secure_filename
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+from reportlab.lib import colors
+import io
 
 
 
@@ -21,6 +27,30 @@ bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 login_manager.login_message_category = 'info'
+
+# --- CONFIGURACIÓN DE CORREO (Flask-Mail) ---
+# Puedes ajustar estos valores con tus credenciales reales
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
+app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
+app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_USERNAME')
+
+mail = Mail(app)
+
+# --- CONFIGURACIÓN DE SUBIDA DE ARCHIVOS ---
+UPLOAD_FOLDER = os.path.join(basedir, 'static', 'uploads')
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max
+ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg', 'gif'}
+
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
+
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -41,6 +71,7 @@ class Usuario(db.Model, UserMixin):
     password_hash = db.Column(db.String(128))
     telefono = db.Column(db.String(20))
     rol = db.Column(db.String(20), nullable=False, default="cliente")
+    foto_perfil = db.Column(db.String(200)) # Ruta a la imagen de perfil
     # admin, empleado, cliente
 
     # Relación muchos a muchos con Servicios (específicamente para empleados)
@@ -154,10 +185,21 @@ class Diagnostico(db.Model):
     empleado_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     descripcion = db.Column(db.Text, nullable=False)
     plan_tratamiento = db.Column(db.Text)
+    puntos_dolor = db.Column(db.Text) # Almacenará coordenadas JSON para el mapa de dolor
     fecha = db.Column(db.DateTime, default=datetime.utcnow)
     
     expediente = db.relationship('Expediente', backref='diagnosticos')
     especialista = db.relationship('Usuario', backref='diagnosticos_realizados')
+
+class Archivo(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    expediente_id = db.Column(db.Integer, db.ForeignKey('expediente.id'), nullable=False)
+    nombre_original = db.Column(db.String(200), nullable=False)
+    nombre_archivo = db.Column(db.String(200), nullable=False)
+    tipo = db.Column(db.String(50)) # pdf, imagen, etc.
+    fecha_subida = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    expediente = db.relationship('Expediente', backref='archivos')
 
 
 
@@ -171,7 +213,26 @@ with app.app_context():
     # necesites borrar citas.db manualmente una vez para que se cree con los nuevos campos.
     try:
         db.create_all()
-        
+        # Asegurar que la columna foto_perfil existe (BD creadas antes de añadirla)
+        try:
+            from sqlalchemy import text
+            if db.engine.url.drivername == 'sqlite':
+                with db.engine.connect() as conn:
+                    r = conn.execute(text("PRAGMA table_info(usuario)"))
+                    cols = [row[1] for row in r]
+                    if 'foto_perfil' not in cols:
+                        conn.execute(text("ALTER TABLE usuario ADD COLUMN foto_perfil VARCHAR(200)"))
+                    
+                    # Reparar diagnostico
+                    r = conn.execute(text("PRAGMA table_info(diagnostico)"))
+                    cols_diag = [row[1] for row in r]
+                    if 'puntos_dolor' not in cols_diag:
+                        conn.execute(text("ALTER TABLE diagnostico ADD COLUMN puntos_dolor TEXT"))
+                    
+                    conn.commit()
+        except Exception:
+            pass
+
         # Sembrar servicios iniciales si la tabla está vacía
         if Servicio.query.count() == 0:
             servicios_iniciales = [
@@ -206,6 +267,19 @@ with app.app_context():
 def favicon():
     return "", 204
 
+def send_email(subject, recipient, template_name, **kwargs):
+    """Función auxiliar para enviar correos electrónicos."""
+    if not recipient:
+        return False
+    try:
+        msg = Message(subject, recipients=[recipient])
+        msg.html = render_template(f"emails/{template_name}.html", **kwargs)
+        mail.send(msg)
+        return True
+    except Exception as e:
+        print(f"Error enviando correo: {e}")
+        return False
+
 
 @app.route("/")
 def index():
@@ -229,7 +303,18 @@ def dashboard():
 def cliente_dashboard():
     # Citas del cliente actual
     citas = Cita.query.filter_by(cliente_id=current_user.id).order_by(Cita.fecha_inicio.desc()).all()
-    return render_template("cliente_dashboard.html", citas=citas)
+    # Diagnósticos del expediente del cliente (evitar acceder relaciones en template)
+    diagnosticos = []
+    try:
+        if hasattr(current_user, 'expediente') and current_user.expediente:
+            diagnosticos = sorted(
+                current_user.expediente.diagnosticos,
+                key=lambda d: d.fecha or datetime.min,
+                reverse=True
+            )
+    except Exception:
+        diagnosticos = []
+    return render_template("cliente_dashboard.html", citas=citas, diagnosticos=diagnosticos)
 
 @app.context_processor
 def inject_globals():
@@ -374,7 +459,9 @@ def editar_usuario(id):
         usuario.nombre = request.form.get("nombre", "").strip()
         usuario.email = request.form.get("email", "").strip().lower()
         usuario.telefono = request.form.get("telefono", "").strip()
-        usuario.rol = request.form.get("rol")
+        rol_nuevo = request.form.get("rol", "").strip()
+        if rol_nuevo:
+            usuario.rol = rol_nuevo
         
         # Opcional: actualizar contraseña si se proporciona (sin espacios accidentales)
         nueva_pw = request.form.get("password", "").strip()
@@ -516,20 +603,47 @@ def enviar_mensaje():
         
         # Si es una petición AJAX, devolvemos JSON
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return {"status": "success", "mensaje": {
+            return jsonify({"status": "success", "mensaje": {
                 "id": nuevo_mensaje.id,
                 "contenido": nuevo_mensaje.contenido,
                 "fecha": nuevo_mensaje.fecha.strftime('%d/%m %H:%M'),
                 "emisor_id": nuevo_mensaje.emisor_id
-            }}
+            }})
             
         flash("Mensaje enviado.", "success")
         return redirect(url_for("mensajeria", conversacion=rid))
     else:
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return {"status": "error", "message": "Contenido vacío"}, 400
+            return jsonify({"status": "error", "message": "Contenido vacío"}), 400
         flash("Escribe un mensaje y elige un contacto.", "danger")
     return redirect(url_for("mensajeria"))
+
+@app.route("/perfil", methods=["GET", "POST"])
+@login_required
+def perfil():
+    if request.method == "POST":
+        current_user.nombre = request.form.get("nombre", "").strip()
+        current_user.telefono = request.form.get("telefono", "").strip()
+        
+        # Cambio de contraseña si se indica
+        password = request.form.get("password")
+        if password:
+            current_user.password_hash = bcrypt.generate_password_hash(password).decode('utf-8')
+            
+        # Foto de perfil
+        if 'foto' in request.files:
+            file = request.files['foto']
+            if file and file.filename != '' and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                unique_filename = f"profile_{current_user.id}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}.{filename.rsplit('.', 1)[1].lower()}"
+                file.save(os.path.join(app.config['UPLOAD_FOLDER'], unique_filename))
+                current_user.foto_perfil = unique_filename
+        
+        db.session.commit()
+        flash("Perfil actualizado correctamente.", "success")
+        return redirect(url_for("perfil"))
+        
+    return render_template("perfil.html")
 
 @app.route("/api/mensajes/<int:contacto_id>")
 @login_required
@@ -542,7 +656,7 @@ def api_get_mensajes(contacto_id):
         )
     ).order_by(Mensaje.fecha.asc()).all()
     
-    return {
+    return jsonify({
         "mensajes": [
             {
                 "id": m.id,
@@ -551,7 +665,68 @@ def api_get_mensajes(contacto_id):
                 "emisor_id": m.emisor_id
             } for m in mensajes
         ]
-    }
+    })
+
+@app.route("/paciente/<int:id>/subir_archivo", methods=["POST"])
+@login_required
+def subir_archivo(id):
+    if current_user.rol not in ['empleado', 'admin']:
+        return redirect(url_for("index"))
+    
+    paciente = Usuario.query.get_or_404(id)
+    if not paciente.expediente:
+        paciente.expediente = Expediente(paciente_id=id)
+        db.session.add(paciente.expediente)
+        db.session.commit()
+
+    if 'archivo' not in request.files:
+        flash("No se seleccionó ningún archivo.", "warning")
+        return redirect(url_for("ver_paciente", id=id))
+    
+    file = request.files['archivo']
+    if file.filename == '':
+        flash("No se seleccionó ningún archivo.", "warning")
+        return redirect(url_for("ver_paciente", id=id))
+    
+    if file and allowed_file(file.filename):
+        filename = secure_filename(file.filename)
+        # Añadir timestamp para evitar colisiones
+        unique_filename = f"{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{filename}"
+        file.save(os.path.join(app.config['UPLOAD_FOLDER'], unique_filename))
+        
+        nuevo_archivo = Archivo(
+            expediente_id=paciente.expediente.id,
+            nombre_original=filename,
+            nombre_archivo=unique_filename,
+            tipo=filename.rsplit('.', 1)[1].lower()
+        )
+        db.session.add(nuevo_archivo)
+        db.session.commit()
+        flash("Archivo subido correctamente.", "success")
+    else:
+        flash("Tipo de archivo no permitido.", "danger")
+        
+    return redirect(url_for("ver_paciente", id=id))
+
+@app.route("/archivo/<int:id>/eliminar")
+@login_required
+def eliminar_archivo(id):
+    archivo = Archivo.query.get_or_404(id)
+    # Solo admin o el empleado que atiende al paciente (simplificado a admin/empleado)
+    if current_user.rol not in ['admin', 'empleado']:
+        flash("Acceso denegado.", "danger")
+        return redirect(url_for("index"))
+    
+    paciente_id = archivo.expediente.paciente_id
+    try:
+        os.remove(os.path.join(app.config['UPLOAD_FOLDER'], archivo.nombre_archivo))
+    except OSError:
+        pass # Si el archivo no existe en disco, procedemos a borrar de DB
+    
+    db.session.delete(archivo)
+    db.session.commit()
+    flash("Archivo eliminado.", "info")
+    return redirect(url_for("ver_paciente", id=paciente_id))
 
 @app.route("/paciente/<int:id>/nuevo_diagnostico", methods=["POST"])
 @login_required
@@ -560,15 +735,21 @@ def agregar_diagnostico(id):
         return redirect(url_for("index"))
     
     paciente = Usuario.query.get_or_404(id)
+    if not paciente.expediente:
+        paciente.expediente = Expediente(paciente_id=id)
+        db.session.add(paciente.expediente)
+        db.session.commit()
     descripcion = request.form.get("descripcion")
     plan = request.form.get("plan_tratamiento")
+    puntos = request.form.get("puntos_dolor") # Datos JSON del mapa de dolor
     
     if descripcion:
         nuevo_diag = Diagnostico(
             expediente_id=paciente.expediente.id,
             empleado_id=current_user.id,
             descripcion=descripcion,
-            plan_tratamiento=plan
+            plan_tratamiento=plan,
+            puntos_dolor=puntos
         )
         db.session.add(nuevo_diag)
         db.session.commit()
@@ -584,11 +765,23 @@ def ver_paciente(id):
         return redirect(url_for("index"))
     
     paciente = Usuario.query.get_or_404(id)
-    if not paciente.expediente:
-        db.session.add(Expediente(paciente_id=id))
+    expediente = Expediente.query.filter_by(paciente_id=id).first()
+    if not expediente:
+        expediente = Expediente(paciente_id=id)
+        db.session.add(expediente)
         db.session.commit()
-        db.session.refresh(paciente)
-    return render_template("paciente_detalle.html", paciente=paciente)
+    # Cargar datos del expediente con consultas directas para no usar relaciones en la plantilla
+    diagnosticos = Diagnostico.query.filter_by(expediente_id=expediente.id).order_by(Diagnostico.fecha.desc()).all()
+    archivos = Archivo.query.filter_by(expediente_id=expediente.id).order_by(Archivo.fecha_subida.desc()).all()
+    notas = NotaEvolucion.query.filter_by(expediente_id=expediente.id).order_by(NotaEvolucion.fecha.desc()).all()
+    return render_template(
+        "paciente_detalle.html",
+        paciente=paciente,
+        expediente=expediente,
+        diagnosticos=diagnosticos,
+        archivos=archivos,
+        notas=notas,
+    )
 
 @app.route("/paciente/<int:id>/nueva_nota", methods=["POST"])
 @login_required
@@ -597,6 +790,10 @@ def agregar_nota(id):
         return redirect(url_for("index"))
     
     paciente = Usuario.query.get_or_404(id)
+    if not paciente.expediente:
+        paciente.expediente = Expediente(paciente_id=id)
+        db.session.add(paciente.expediente)
+        db.session.commit()
     contenido = request.form.get("contenido")
     
     if contenido:
@@ -632,14 +829,14 @@ def editar_expediente(id):
 def api_especialistas():
     servicio_id = request.args.get("servicio_id")
     if not servicio_id:
-        return {"error": "Falta servicio_id"}, 400
+        return jsonify({"error": "Falta servicio_id"}), 400
     
     servicio = Servicio.query.get(int(servicio_id))
     if not servicio:
-        return {"error": "Servicio no encontrado"}, 404
+        return jsonify({"error": "Servicio no encontrado"}), 404
     
     especialistas = [{"id": e.id, "nombre": e.nombre} for e in servicio.especialistas.all()]
-    return {"especialistas": especialistas}
+    return jsonify({"especialistas": especialistas})
 
 @app.route("/admin/stats")
 @login_required
@@ -651,12 +848,12 @@ def admin_stats():
     citas_completadas = Cita.query.filter_by(estado="Completada").count()
     
     # Ingresos totales (solo citas pagadas)
-    ingresos_totales = db.session.query(db.func.sum(Servicio.precio)).join(Cita).filter(Cita.pagado == True).scalar() or 0
-    ingresos_pendientes = db.session.query(db.func.sum(Servicio.precio)).join(Cita).filter(Cita.pagado == False, Cita.estado != "Cancelada").scalar() or 0
+    ingresos_totales = db.session.query(db.func.sum(Servicio.precio)).select_from(Cita).join(Servicio, Cita.servicio_id == Servicio.id).filter(Cita.pagado == True).scalar() or 0
+    ingresos_pendientes = db.session.query(db.func.sum(Servicio.precio)).select_from(Cita).join(Servicio, Cita.servicio_id == Servicio.id).filter(Cita.pagado == False, Cita.estado != "Cancelada").scalar() or 0
 
     raw_populares = db.session.query(
         Servicio.nombre, db.func.count(Cita.id)
-    ).join(Cita).group_by(Servicio.nombre).all()
+    ).select_from(Servicio).join(Cita, Servicio.id == Cita.servicio_id).group_by(Servicio.nombre).all()
     
     servicios_populares = []
     for nombre, count in raw_populares:
@@ -744,14 +941,14 @@ def api_slots():
     empleado_id = request.args.get("empleado_id")
     
     if not (fecha_str and servicio_id):
-        return {"error": "Faltan parámetros"}, 400
+        return jsonify({"error": "Faltan parámetros"}), 400
     try:
         fecha_dt = datetime.strptime(fecha_str, "%Y-%m-%d")
         slots = obtener_slots_disponibles(fecha_dt, int(servicio_id), 
                                          int(empleado_id) if empleado_id else None)
-        return {"slots": slots}
+        return jsonify({"slots": slots})
     except Exception as e:
-        return {"error": str(e)}, 500
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/agendar", methods=["GET", "POST"])
 @login_required
@@ -852,6 +1049,19 @@ def agendar():
 
             db.session.add(nueva_cita)
             db.session.commit()
+
+            # --- NOTIFICACIÓN POR CORREO ---
+            send_email(
+                subject="Cita Confirmada - Centro de Fisioterapia",
+                recipient=current_user.email if current_user.rol == 'cliente' else email,
+                template_name="cita_confirmada",
+                nombre=current_user.nombre if current_user.rol == 'cliente' else nombre,
+                servicio=servicio.nombre,
+                especialista=especialista_libre.nombre,
+                fecha=fecha_str,
+                hora=hora_str
+            )
+
             flash("Cita agendada exitosamente.", "success")
         except Exception as e:
             db.session.rollback()
@@ -889,6 +1099,7 @@ def limpiar_base_datos():
         # Orden por dependencias de claves foráneas
         NotaEvolucion.query.delete()
         Diagnostico.query.delete()
+        Archivo.query.delete()
         Mensaje.query.delete()
         Cita.query.delete()
         Expediente.query.delete()
@@ -1042,6 +1253,65 @@ def eliminar_faq(id):
     flash("FAQ eliminada.", "info")
     return redirect(url_for("gestion_contenido"))
 
+@app.route("/cita/<int:id>/recibo")
+@login_required
+def generar_recibo(id):
+    cita = Cita.query.get_or_404(id)
+    # Validar que sea el cliente de la cita o admin/empleado
+    if current_user.rol == 'cliente' and cita.cliente_id != current_user.id:
+        flash("Acceso denegado.", "danger")
+        return redirect(url_for("index"))
+    
+    # Crear buffer
+    buffer = io.BytesIO()
+    p = canvas.Canvas(buffer, pagesize=letter)
+    width, height = letter
+
+    # Logo (si existe) y Título
+    p.setFont("Helvetica-Bold", 16)
+    p.drawString(100, height - 50, "RECIBO DE PAGO - CENTRO DE FISIOTERAPIA")
+    
+    p.setFont("Helvetica", 12)
+    p.drawString(100, height - 80, f"Fecha de emisión: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+    p.drawString(100, height - 100, f"Número de Cita: #{cita.id}")
+
+    # Datos del Cliente
+    p.line(100, height - 120, 500, height - 120)
+    p.setFont("Helvetica-Bold", 12)
+    p.drawString(100, height - 140, "DATOS DEL PACIENTE")
+    p.setFont("Helvetica", 11)
+    p.drawString(100, height - 160, f"Nombre: {cita.cliente.nombre}")
+    p.drawString(100, height - 180, f"Email: {cita.cliente.email}")
+    p.drawString(100, height - 200, f"Teléfono: {cita.cliente.telefono or 'N/A'}")
+
+    # Datos del Servicio
+    p.line(100, height - 220, 500, height - 220)
+    p.setFont("Helvetica-Bold", 12)
+    p.drawString(100, height - 240, "DETALLE DEL SERVICIO")
+    p.setFont("Helvetica", 11)
+    p.drawString(100, height - 260, f"Servicio: {cita.servicio.nombre}")
+    p.drawString(100, height - 280, f"Especialista: {cita.empleado.nombre if cita.empleado else 'No asignado'}")
+    p.drawString(100, height - 300, f"Fecha de Cita: {cita.fecha_inicio.strftime('%d/%m/%Y %H:%M')}")
+    p.drawString(100, height - 320, f"Estado: {cita.estado}")
+    
+    # Pago
+    p.line(100, height - 340, 500, height - 340)
+    p.setFont("Helvetica-Bold", 14)
+    p.drawString(100, height - 370, f"TOTAL PAGADO: ${cita.servicio.precio}")
+    p.setFont("Helvetica", 11)
+    p.drawString(100, height - 390, f"Método de pago: {cita.metodo_pago or 'No especificado'}")
+
+    p.setFont("Helvetica-Oblique", 10)
+    p.drawString(100, 100, "Gracias por confiar en el Centro de Fisioterapia.")
+    p.drawString(100, 85, "Este documento es un comprobante de pago interno.")
+
+    p.showPage()
+    p.save()
+
+    buffer.seek(0)
+    from flask import send_file
+    return send_file(buffer, as_attachment=True, download_name=f"Recibo_Cita_{cita.id}.pdf", mimetype='application/pdf')
+
 @app.route("/admin/calendario")
 @login_required
 def admin_calendario():
@@ -1051,7 +1321,7 @@ def admin_calendario():
 @app.route("/api/citas_calendario")
 @login_required
 def api_citas_calendario():
-    if current_user.rol != 'admin': return {"error": "Unauthorized"}, 403
+    if current_user.rol != 'admin': return jsonify({"error": "Unauthorized"}), 403
     citas = Cita.query.filter(Cita.estado != "Cancelada").all()
     eventos = []
     for c in citas:
@@ -1062,7 +1332,7 @@ def api_citas_calendario():
             'end': c.fecha_fin.isoformat(),
             'color': '#ffc107' if c.estado == 'Pendiente' else '#0d6efd' if c.estado == 'Confirmada' else '#198754'
         })
-    return {"eventos": eventos}
+    return jsonify({"eventos": eventos})
 
 @app.route("/admin/agregar_servicio", methods=["POST"])
 @login_required

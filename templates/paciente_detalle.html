@@ -14,8 +14,13 @@
         <div class="col-md-4">
             <div class="card border-0 shadow-sm rounded-4 mb-4">
                 <div class="card-body text-center p-4">
+                    {% if paciente.foto_perfil %}
+                    <img src="{{ url_for('static', filename='uploads/' + paciente.foto_perfil) }}"
+                        class="rounded-circle mb-3 shadow-sm" width="100" height="100" style="object-fit: cover;">
+                    {% else %}
                     <img src="https://ui-avatars.com/api/?name={{ paciente.nombre }}&background=random"
                         class="rounded-circle mb-3" width="100">
+                    {% endif %}
                     <h4>{{ paciente.nombre }}</h4>
                     <p class="text-muted mb-1"><i class="bi bi-envelope"></i> {{ paciente.email }}</p>
                     <p class="text-muted"><i class="bi bi-telephone"></i> {{ paciente.telefono }}</p>
@@ -28,10 +33,10 @@
                                 <i class="bi bi-pencil"></i>
                             </button>
                         </div>
-                        <p class="small text-muted mb-3">{{ paciente.expediente.antecedentes or 'Sin registrar' }}</p>
+                        <p class="small text-muted mb-3">{{ expediente.antecedentes or 'Sin registrar' }}</p>
 
                         <h6>Alergias:</h6>
-                        <p class="small text-danger mb-3">{{ paciente.expediente.alergias or 'Ninguna conocida' }}</p>
+                        <p class="small text-danger mb-3">{{ expediente.alergias or 'Ninguna conocida' }}</p>
 
                         <!-- Formulario de Edición colapsable -->
                         <div class="collapse" id="editExpediente">
@@ -40,16 +45,60 @@
                                 <div class="mb-2">
                                     <label class="small fw-bold">Antecedentes:</label>
                                     <textarea name="antecedentes" class="form-control form-control-sm"
-                                        rows="3">{{ paciente.expediente.antecedentes or '' }}</textarea>
+                                        rows="3">{{ expediente.antecedentes or '' }}</textarea>
                                 </div>
                                 <div class="mb-2">
                                     <label class="small fw-bold">Alergias:</label>
                                     <textarea name="alergias" class="form-control form-control-sm"
-                                        rows="2">{{ paciente.expediente.alergias or '' }}</textarea>
+                                        rows="2">{{ expediente.alergias or '' }}</textarea>
                                 </div>
                                 <button type="submit" class="btn btn-success btn-sm w-100">Actualizar</button>
                             </form>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gestión de Archivos -->
+            <div class="card border-0 shadow-sm rounded-4 mb-4">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0 fw-bold small"><i class="bi bi-file-earmark-medical me-2"></i>Archivos y Estudios
+                    </h6>
+                    <button class="btn btn-sm btn-outline-success" data-bs-toggle="modal"
+                        data-bs-target="#modalSubirArchivo">
+                        <i class="bi bi-plus-lg"></i>
+                    </button>
+                </div>
+                <div class="card-body p-2">
+                    <div class="list-group list-group-flush">
+                        {% if archivos %}
+                        {% for archivo in archivos %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center small py-2 px-1">
+                            <div class="d-flex align-items-center overflow-hidden">
+                                {% if archivo.tipo == 'pdf' %}
+                                <i class="bi bi-file-pdf text-danger fs-5 me-2"></i>
+                                {% else %}
+                                <i class="bi bi-image text-primary fs-5 me-2"></i>
+                                {% endif %}
+                                <a href="{{ url_for('static', filename='uploads/' + archivo.nombre_archivo) }}"
+                                    target="_blank" class="text-decoration-none text-truncate"
+                                    style="max-width: 150px;">
+                                    {{ archivo.nombre_original }}
+                                </a>
+                            </div>
+                            <a href="{{ url_for('eliminar_archivo', id=archivo.id) }}" class="text-danger ms-2"
+                                onclick="return confirm('¿Eliminar este archivo?')">
+                                <i class="bi bi-trash"></i>
+                            </a>
+                        </div>
+                        {% else %}
+                        <p class="text-center text-muted py-3 mb-0 small" style="font-size: 0.7rem;">Sin archivos
+                            subidos.</p>
+                        {% endfor %}
+                        {% else %}
+                        <p class="text-center text-muted py-3 mb-0 small" style="font-size: 0.7rem;">Sin archivos
+                            subidos.</p>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -72,12 +121,12 @@
                     </form>
 
                     <div class="list-group list-group-flush" style="max-height: 400px; overflow-y: auto;">
-                        {% for nota in paciente.expediente.notas|sort(attribute='fecha', reverse=True) %}
+                        {% for nota in notas %}
                         <div class="list-group-item px-0 py-3 border-0 border-bottom">
                             <div class="d-flex justify-content-between">
-                                <h6 class="mb-1 text-primary small">{{ nota.autor.nombre }}</h6>
+                                <h6 class="mb-1 text-primary small">{{ nota.autor.nombre if nota.autor else 'N/A' }}</h6>
                                 <small class="text-muted"
-                                    style="font-size: 0.7rem;">{{ nota.fecha.strftime('%d/%m/%Y %H:%M') }}</small>
+                                    style="font-size: 0.7rem;">{{ nota.fecha.strftime('%d/%m/%Y %H:%M') if nota.fecha else '' }}</small>
                             </div>
                             <p class="mb-1 small">{{ nota.contenido }}</p>
                         </div>
@@ -97,19 +146,49 @@
                     <h5 class="mb-0 small"><i class="bi bi-clipboard-pulse me-2"></i>Diagnóstico</h5>
                 </div>
                 <div class="card-body">
-                    {% for diag in paciente.expediente.diagnosticos|sort(attribute='fecha', reverse=True) %}
-                    <div class="mb-2 p-2 border rounded-3 bg-light">
+                    {% if diagnosticos %}
+                    {% for diag in diagnosticos %}
+                    <div class="mb-2 p-2 border rounded-3 bg-light position-relative">
                         <p class="fw-bold mb-1 small">{{ diag.descripcion }}</p>
                         {% if diag.plan_tratamiento %}
                         <p class="text-muted mb-0" style="font-size: 0.75rem;">{{ diag.plan_tratamiento }}</p>
                         {% endif %}
+
+                        {# Visualización de puntos de dolor si existen #}
+                        {% if diag.puntos_dolor %}
+                        <div class="mt-2 text-center" style="max-width: 100px; margin: 0 auto; opacity: 0.7;">
+                            <svg viewBox="0 0 100 100" class="border rounded bg-white">
+                                <path
+                                    d="M50,10 c-2,0 -4,2 -4,5 c0,3 2,5 4,5 s4,-2 4,-5 C54,12 52,10 50,10 z M50,22 c-5,0 -8,4 -8,8 v15 c-4,0 -6,2 -6,4 v15 c0,2 2,4 4,4 h2 v20 c0,2 2,4 4,4 h8 c2,0 4,-2 4,-4 v-20 h2 c2,0 4,-2 4,-4 v-15 c0,-2 -2,-4 -6,-4 v-15 C58,26 55,22 50,22 z"
+                                    fill="#eee" stroke="#ccc" stroke-width="0.5" />
+                                {% set puntos = diag.puntos_dolor %}
+                                {# Nota: El renderizado de puntos guardados se hace vía JS o simplificado aquí si se requiere #}
+                                <script>
+                                    document.addEventListener('DOMContentLoaded', function () {
+                                        const pData = JSON.parse('{{ diag.puntos_dolor | safe }}');
+                                        const svg = document.querySelector('svg:last-of-type');
+                                        pData.forEach(p => {
+                                            const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                                            c.setAttribute("cx", p.x); c.setAttribute("cy", p.y);
+                                            c.setAttribute("r", "5"); c.setAttribute("fill", "red");
+                                            svg.appendChild(c);
+                                        });
+                                    });
+                                </script>
+                            </svg>
+                        </div>
+                        {% endif %}
+
                         <small class="text-muted d-block mt-1"
-                            style="font-size: 0.65rem;">{{ diag.fecha.strftime('%d/%m/%Y') }} -
-                            {{ diag.especialista.nombre }}</small>
+                            style="font-size: 0.65rem;">{{ diag.fecha.strftime('%d/%m/%Y') if diag.fecha else 'N/A' }} -
+                            {{ diag.especialista.nombre if diag.especialista else 'N/A' }}</small>
                     </div>
                     {% else %}
                     <p class="text-muted small">Sin diagnósticos formales.</p>
                     {% endfor %}
+                    {% else %}
+                    <p class="text-muted small">Sin diagnósticos formales.</p>
+                    {% endif %}
 
                     <button class="btn btn-outline-success btn-sm w-100 mt-2" data-bs-toggle="collapse"
                         data-bs-target="#formDiagnostico">
@@ -122,10 +201,26 @@
                                 <input type="text" name="descripcion" class="form-control form-control-sm"
                                     placeholder="Diagnóstico" required>
                             </div>
-                            <div class="mb-3">
+                            <div class="mb-2">
                                 <textarea name="plan_tratamiento" class="form-control form-control-sm" rows="2"
                                     placeholder="Plan de tratamiento"></textarea>
                             </div>
+
+                            <div class="mb-3">
+                                <label class="small fw-bold d-block mb-1">Puntos de dolor:</label>
+                                <div class="body-map-container"
+                                    style="background:#fff; border: 1px solid #ddd; border-radius: 8px;">
+                                    <svg id="bodyMap" viewBox="0 0 100 100" class="body-svg">
+                                        <path
+                                            d="M50,10 c-2,0 -4,2 -4,5 c0,3 2,5 4,5 s4,-2 4,-5 C54,12 52,10 50,10 z M50,22 c-5,0 -8,4 -8,8 v15 c-4,0 -6,2 -6,4 v15 c0,2 2,4 4,4 h2 v20 c0,2 2,4 4,4 h8 c2,0 4,-2 4,-4 v-20 h2 c2,0 4,-2 4,-4 v-15 c0,-2 -2,-4 -6,-4 v-15 C58,26 55,22 50,22 z"
+                                            fill="#dee2e6" stroke="#adb5bd" stroke-width="0.5" />
+                                    </svg>
+                                    <input type="hidden" name="puntos_dolor" id="puntosDolorInput">
+                                </div>
+                                <p class="text-muted text-center mt-1" style="font-size: 0.6rem;">Clic para marcar /
+                                    clic en punto para borrar</p>
+                            </div>
+
                             <button type="submit" class="btn btn-success btn-sm w-100">Registrar</button>
                         </form>
                     </div>
@@ -139,4 +234,100 @@
         </div>
     </div>
 </div>
+
+<!-- Modal Subir Archivo -->
+<div class="modal fade" id="modalSubirArchivo" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4 border-0 shadow">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold">Subir Estudio o Documento</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('subir_archivo', id=paciente.id) }}" method="POST" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Seleccionar archivo</label>
+                        <input type="file" name="archivo" class="form-control" required>
+                        <div class="form-text">PDF o Imágenes (JPG, PNG). Máximo 16MB.</div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success">Subir Archivo</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+    .body-map-container {
+        position: relative;
+        width: 100%;
+        max-width: 200px;
+        margin: 0 auto;
+        cursor: crosshair;
+    }
+
+    .body-svg {
+        width: 100%;
+        height: auto;
+    }
+
+    .pain-point {
+        fill: #dc3545;
+        stroke: white;
+        stroke-width: 2;
+        r: 5;
+        cursor: pointer;
+        transition: transform 0.2s;
+    }
+
+    .pain-point:hover {
+        transform: scale(1.3);
+    }
+</style>
+
+<script>
+    const bodyMap = document.getElementById('bodyMap');
+    const painPointsInput = document.getElementById('puntosDolorInput');
+    let points = [];
+
+    if (bodyMap) {
+        bodyMap.addEventListener('click', function (e) {
+            const rect = bodyMap.getBoundingClientRect();
+            const x = ((e.clientX - rect.left) / rect.width) * 100;
+            const y = ((e.clientY - rect.top) / rect.height) * 100;
+            addPoint(x, y);
+        });
+    }
+
+    function addPoint(x, y) {
+        points.push({ x, y });
+        renderPoints();
+        updateInput();
+    }
+
+    function removePoint(index) {
+        points.splice(index, 1);
+        renderPoints();
+        updateInput();
+    }
+
+    function renderPoints() {
+        const existingPoints = bodyMap.querySelectorAll('.pain-point');
+        existingPoints.forEach(p => p.remove());
+        points.forEach((p, index) => {
+            const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            circle.setAttribute("cx", p.x); circle.setAttribute("cy", p.y);
+            circle.setAttribute("class", "pain-point");
+            circle.setAttribute("onclick", `event.stopPropagation(); removePoint(${index});`);
+            bodyMap.appendChild(circle);
+        });
+    }
+
+    function updateInput() {
+        if (painPointsInput) painPointsInput.value = JSON.stringify(points);
+    }
+</script>
 {% endblock %}

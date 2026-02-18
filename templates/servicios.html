@@ -94,7 +94,7 @@
                     <h5 class="text-white">{{ servicio.nombre }}</h5>
 
                     <p class="text-light small">
-                        {{ servicio.descripcion[:100] }}...
+                        {{ (servicio.descripcion or '')[:100] }}{% if (servicio.descripcion or '')|length > 100 %}...{% endif %}
                     </p>
 
                     <p class="fw-bold text-info">$ {{ servicio.precio }}</p>
