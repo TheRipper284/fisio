@@ -56,11 +56,15 @@
                                     <td>
                                         {% if cita.pagado %}
                                         <a href="{{ url_for('generar_recibo', id=cita.id) }}"
-                                            class="btn btn-sm btn-outline-dark">
+                                            class="btn btn-sm btn-outline-dark shadow-sm">
                                             <i class="bi bi-file-earmark-pdf"></i> PDF
                                         </a>
                                         {% else %}
-                                        <span class="text-muted small">Pendiente</span>
+                                        <a href="{{ url_for('crear_sesion_pago', cita_id=cita.id) }}"
+                                            class="btn btn-sm btn-primary shadow-sm"
+                                            onclick="this.innerHTML='Procesando...'; this.classList.add('disabled');">
+                                            <i class="bi bi-credit-card me-1"></i> Pagar
+                                        </a>
                                         {% endif %}
                                     </td>
                                 </tr>
@@ -93,7 +97,8 @@
                         <p class="small text-muted mb-0" style="font-size: 0.7rem;">Plan:
                             {{ diag.plan_tratamiento or 'Seguir indicaciones' }}</p>
                         <hr class="my-2">
-                        <small class="text-muted" style="font-size: 0.65rem;">{{ diag.fecha.strftime('%d/%m/%Y') if diag.fecha else 'N/A' }} -
+                        <small class="text-muted"
+                            style="font-size: 0.65rem;">{{ diag.fecha.strftime('%d/%m/%Y') if diag.fecha else 'N/A' }} -
                             {{ diag.especialista.nombre if diag.especialista else 'N/A' }}</small>
                     </div>
                     {% endfor %}
@@ -103,14 +108,18 @@
                 </div>
             </div>
 
-            <!-- Centro de Mensajes -->
-            <div class="card shadow-sm border-0 rounded-4">
+            <!-- Soporte WhatsApp -->
+            <div class="card shadow-sm border-0 rounded-4 bg-light overflow-hidden">
                 <div class="card-body p-4 text-center">
-                    <i class="bi bi-chat-dots-fill display-5 text-primary mb-3"></i>
-                    <h5>¿Tienes dudas?</h5>
-                    <p class="text-muted small">Escríbele directamente a tu especialista.</p>
-                    <a href="{{ url_for('mensajeria') }}" class="btn btn-primary w-100 rounded-pill py-2">
-                        Abrir Mensajería
+                    <div class="mb-3">
+                        <i class="bi bi-whatsapp display-5 text-success"></i>
+                    </div>
+                    <h5 class="fw-bold">¿Necesitas Ayuda?</h5>
+                    <p class="text-muted small">Contáctanos vía WhatsApp para cualquier duda con tu tratamiento o
+                        agenda.</p>
+                    <a href="https://wa.me/521234567890?text=Hola,%20tengo%20una%20duda%20sobre%20mi%20cita%20en%20el%20Centro%20de%20Fisioterapia."
+                        target="_blank" class="btn btn-success w-100 rounded-pill py-2 shadow-sm">
+                        <i class="bi bi-whatsapp me-2"></i> WhatsApp Soporte
                     </a>
                 </div>
             </div>

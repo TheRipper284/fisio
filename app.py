@@ -11,6 +11,11 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 import io
+import stripe
+
+# --- CONFIGURACIÓN DE STRIPE ---
+stripe.api_key = os.environ.get('STRIPE_SECRET_KEY', 'sk_test_51...tus_llaves_aqui')
+STRIPE_PUBLIC_KEY = os.environ.get('STRIPE_PUBLIC_KEY', 'pk_test_51...tus_llaves_aqui')
 
 
 
@@ -49,8 +54,8 @@ if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
 def allowed_file(filename):
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -77,6 +82,10 @@ class Usuario(db.Model, UserMixin):
     # Relación muchos a muchos con Servicios (específicamente para empleados)
     servicios = db.relationship('Servicio', secondary=usuario_servicio, 
                                 backref=db.backref('especialistas', lazy='dynamic'))
+
+    # --- NUEVOS CAMPOS ENTERPRISE ---
+    acepto_consentimiento = db.Column(db.Boolean, default=False)
+    consentimiento_fecha = db.Column(db.DateTime)
 
 
 # Modelo de Cita
@@ -108,9 +117,10 @@ class Cita(db.Model):
     estado = db.Column(db.String(20), default="Pendiente")
     # Pendiente, Confirmada, Cancelada, Completada
     
-    # --- NUEVOS CAMPOS FINANCIEROS ---
+    # --- NUEVOS CAMPOS FINANCIEROS Y ENTERPRISE ---
     pagado = db.Column(db.Boolean, default=False)
-    metodo_pago = db.Column(db.String(50)) # Efectivo, Tarjeta, Transferencia
+    metodo_pago = db.Column(db.String(50)) # Efectivo, Tarjeta, Transferencia, Stripe
+    stripe_id = db.Column(db.String(200)) # Identificador de transacción Stripe
     
     fecha_registro = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -148,6 +158,16 @@ class NotaEvolucion(db.Model):
     
     expediente = db.relationship('Expediente', backref='notas')
     autor = db.relationship('Usuario', backref='notas_escritas')
+
+class HorarioEspecialista(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    usuario_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    dia_semana = db.Column(db.Integer, nullable=False) # 0=Lunes, 6=Domingo
+    hora_inicio = db.Column(db.Time, nullable=False)
+    hora_fin = db.Column(db.Time, nullable=False)
+    activo = db.Column(db.Boolean, default=True)
+
+    especialista = db.relationship('Usuario', backref='horarios_personalizados')
 
 class Testimonio(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -223,12 +243,20 @@ with app.app_context():
                     if 'foto_perfil' not in cols:
                         conn.execute(text("ALTER TABLE usuario ADD COLUMN foto_perfil VARCHAR(200)"))
                     
-                    # Reparar diagnostico
-                    r = conn.execute(text("PRAGMA table_info(diagnostico)"))
-                    cols_diag = [row[1] for row in r]
-                    if 'puntos_dolor' not in cols_diag:
-                        conn.execute(text("ALTER TABLE diagnostico ADD COLUMN puntos_dolor TEXT"))
+                    # Reparar usuario para consentimientos
+                    r = conn.execute(text("PRAGMA table_info(usuario)"))
+                    cols_user = [row[1] for row in r]
+                    if 'acepto_consentimiento' not in cols_user:
+                        conn.execute(text("ALTER TABLE usuario ADD COLUMN acepto_consentimiento BOOLEAN DEFAULT 0"))
+                    if 'consentimiento_fecha' not in cols_user:
+                        conn.execute(text("ALTER TABLE usuario ADD COLUMN consentimiento_fecha DATETIME"))
                     
+                    # Reparar cita para Stripe
+                    r = conn.execute(text("PRAGMA table_info(cita)"))
+                    cols_cita = [row[1] for row in r]
+                    if 'stripe_id' not in cols_cita:
+                        conn.execute(text("ALTER TABLE cita ADD COLUMN stripe_id VARCHAR(200)"))
+
                     conn.commit()
         except Exception:
             pass
@@ -283,6 +311,8 @@ def send_email(subject, recipient, template_name, **kwargs):
 
 @app.route("/")
 def index():
+    if current_user.is_authenticated and not current_user.acepto_consentimiento:
+        return redirect(url_for('consentimiento'))
     faqs = FAQ.query.all()
     # Solo testimonios activos
     testimonios = Testimonio.query.filter_by(activo=True).all()
@@ -316,12 +346,70 @@ def cliente_dashboard():
         diagnosticos = []
     return render_template("cliente_dashboard.html", citas=citas, diagnosticos=diagnosticos)
 
+@app.route("/consentimiento", methods=["GET", "POST"])
+@login_required
+def consentimiento():
+    if request.method == "POST":
+        current_user.acepto_consentimiento = True
+        current_user.consentimiento_fecha = datetime.utcnow()
+        db.session.commit()
+        flash("Gracias por aceptar los términos de consentimiento clínico.", "success")
+        return redirect(url_for("index"))
+    return render_template("consentimiento.html")
+
+@app.route("/crear-sesion-pago/<int:cita_id>")
+@login_required
+def crear_sesion_pago(cita_id):
+    cita = Cita.query.get_or_404(cita_id)
+    if cita.cliente_id != current_user.id:
+        return jsonify({"error": "No autorizado"}), 403
+    
+    try:
+        checkout_session = stripe.checkout.Session.create(
+            payment_method_types=['card'],
+            line_items=[{
+                'price_data': {
+                    'currency': 'mxn',
+                    'product_data': {
+                        'name': cita.servicio.nombre,
+                        'description': f"Cita con especialista para {cita.servicio.nombre}",
+                    },
+                    'unit_amount': int(cita.servicio.precio * 100),
+                },
+                'quantity': 1,
+            }],
+            mode='payment',
+            success_url=url_for('pago_exitoso', cita_id=cita.id, _external=True) + '?session_id={CHECKOUT_SESSION_ID}',
+            cancel_url=url_for('cliente_dashboard', _external=True),
+        )
+        return redirect(checkout_session.url, code=303)
+    except Exception as e:
+        flash(f"Error al procesar pago: {str(e)}", "danger")
+        return redirect(url_for('cliente_dashboard'))
+
+@app.route("/pago-exitoso/<int:cita_id>")
+@login_required
+def pago_exitoso(cita_id):
+    session_id = request.args.get('session_id')
+    cita = Cita.query.get_or_404(cita_id)
+    
+    if session_id:
+        session = stripe.checkout.Session.retrieve(session_id)
+        cita.pagado = True
+        cita.stripe_id = session.id
+        cita.metodo_pago = "Stripe / Tarjeta"
+        db.session.commit()
+        flash("¡Pago realizado con éxito!", "success")
+    
+    return redirect(url_for('cliente_dashboard'))
+
 @app.context_processor
 def inject_globals():
     servicios_lista = Servicio.query.all()
     return {
         'servicios_global': servicios_lista,
-        'fecha_actual_global': date.today().isoformat()
+        'fecha_actual_global': date.today().isoformat(),
+        'stripe_public_key': STRIPE_PUBLIC_KEY
     }
 
 @app.route("/servicios")
@@ -890,12 +978,7 @@ def obtener_slots_disponibles(fecha_dt, servicio_id, empleado_id=None):
     if not especialistas or not especialistas[0]:
         return []
     
-    # Horario de atención: 09:00 a 18:00
-    inicio_jornada = fecha_dt.replace(hour=9, minute=0, second=0, microsecond=0)
-    fin_jornada = fecha_dt.replace(hour=18, minute=0, second=0, microsecond=0)
-    
     slots_disponibles = []
-    actual = inicio_jornada
     
     # Obtener citas existentes para los especialistas asignados ese día
     ids_especialistas = [e.id for e in especialistas]
@@ -904,32 +987,47 @@ def obtener_slots_disponibles(fecha_dt, servicio_id, empleado_id=None):
         Cita.estado != "Cancelada",
         Cita.empleado_id.in_(ids_especialistas)
     ).all()
+
+    # Iterar especialistas para encontrar sus horarios específicos ese día
+    dia_semana = fecha_dt.weekday() # 0=Lunes
     
-    while actual + timedelta(minutes=servicio.duracion_minutos) <= fin_jornada:
-        inicio_slot = actual
-        fin_slot = actual + timedelta(minutes=servicio.duracion_minutos)
+    for especialista in especialistas:
+        # Buscar horario personalizado
+        horario = HorarioEspecialista.query.filter_by(
+            usuario_id=especialista.id, 
+            dia_semana=dia_semana, 
+            activo=True
+        ).first()
         
-        # Un slot está disponible si al menos UN especialista asignado está libre
-        al_menos_uno_libre = False
-        
-        for esp in especialistas:
-            # Verificar si ESTE especialista está ocupado en este horario
-            esta_ocupado = False
-            for cita in citas_existentes:
-                if cita.empleado_id == esp.id:
-                    if (inicio_slot < cita.fecha_fin) and (fin_slot > cita.fecha_inicio):
-                        esta_ocupado = True
-                        break
+        if horario:
+            inicio_h = fecha_dt.replace(hour=horario.hora_inicio.hour, minute=horario.hora_inicio.minute, second=0)
+            fin_h = fecha_dt.replace(hour=horario.hora_fin.hour, minute=horario.hora_fin.minute, second=0)
+        else:
+            # Default 9-18
+            inicio_h = fecha_dt.replace(hour=9, minute=0, second=0)
+            fin_h = fecha_dt.replace(hour=18, minute=0, second=0)
+
+        actual = inicio_h
+        while actual + timedelta(minutes=servicio.duracion_minutos) <= fin_h:
+            inicio_slot = actual
+            fin_slot = actual + timedelta(minutes=servicio.duracion_minutos)
             
-            if not esta_ocupado:
-                al_menos_uno_libre = True
-                break
-        
-        if al_menos_uno_libre:
-            slots_disponibles.append(inicio_slot.strftime("%H:%M"))
-        
-        # Incrementos de 30 minutos
-        actual += timedelta(minutes=30)
+            # Verificar si este especialista está libre en este slot
+            ocupado = any(
+                c.empleado_id == especialista.id and
+                not (fin_slot <= c.fecha_inicio or inicio_slot >= c.fecha_fin)
+                for c in citas_existentes
+            )
+            
+            if not ocupado:
+                slot_str = inicio_slot.strftime('%H:%M')
+                if slot_str not in slots_disponibles:
+                    slots_disponibles.append(slot_str)
+            
+            actual += timedelta(minutes=30) # Saltos de 30 min para mayor flexibilidad
+
+    slots_disponibles.sort()
+    return slots_disponibles
         
     return slots_disponibles
 
@@ -1401,3 +1499,45 @@ def internal_error(error):
 
 if __name__ == "__main__":
     app.run(debug=True)
+
+@app.route("/perfil/horarios", methods=["GET", "POST"])
+@login_required
+def gestionar_horarios():
+    if current_user.rol not in ['admin', 'empleado']:
+        flash("Acceso restringido.", "danger")
+        return redirect(url_for('index'))
+    
+    if request.method == "POST":
+        dia = int(request.form.get("dia_semana"))
+        try:
+            desde = datetime.strptime(request.form.get("hora_inicio"), "%H:%M").time()
+            hasta = datetime.strptime(request.form.get("hora_fin"), "%H:%M").time()
+            
+            nuevo_horario = HorarioEspecialista(
+                usuario_id=current_user.id,
+                dia_semana=dia,
+                hora_inicio=desde,
+                hora_fin=hasta
+            )
+            db.session.add(nuevo_horario)
+            db.session.commit()
+            flash("Horario actualizado.", "success")
+        except Exception as e:
+            flash(f"Error en formato de hora: {e}", "danger")
+            
+        return redirect(url_for('gestionar_horarios'))
+
+    horarios = HorarioEspecialista.query.filter_by(usuario_id=current_user.id).order_by(HorarioEspecialista.dia_semana, HorarioEspecialista.hora_inicio).all()
+    dias_nombre = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+    return render_template("horarios.html", horarios=horarios, dias_nombre=dias_nombre)
+
+@app.route("/horario/<int:id>/eliminar")
+@login_required
+def eliminar_horario(id):
+    h = HorarioEspecialista.query.get_or_404(id)
+    if h.usuario_id != current_user.id and current_user.rol != 'admin':
+        return redirect(url_for('index'))
+    db.session.delete(h)
+    db.session.commit()
+    flash("Horario eliminado.", "info")
+    return redirect(url_for('gestionar_horarios'))

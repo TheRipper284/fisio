@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-5 reveal">
+    <div class="row mb-4 align-items-center">
+        <div class="col-md-8">
+            <h2 class="fw-bold" style="color: var(--primary-color);">Gestión de Horarios</h2>
+            <p class="text-muted">Define tus horas de disponibilidad para que los pacientes puedan agendar.</p>
+        </div>
+        <div class="col-md-4 text-md-end">
+            <a href="{{ url_for('perfil') }}" class="btn btn-outline-secondary rounded-pill">
+                <i class="bi bi-arrow-left me-2"></i> Volver al Perfil
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Formulario para agregar horario -->
+        <div class="col-md-4 mb-4">
+            <div class="card border-0 shadow-lg p-4" style="border-radius: 25px;">
+                <h5 class="fw-bold mb-4">Añadir Jornada</h5>
+                <form action="{{ url_for('gestionar_horarios') }}" method="POST">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Día de la Semana</label>
+                        <select name="dia_semana" class="form-select rounded-3" required>
+                            {% for i in range(7) %}
+                            <option value="{{ i }}">{{ dias_nombre[i] }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="row g-2 mb-4">
+                        <div class="col-6">
+                            <label class="form-label small fw-bold">Desde</label>
+                            <input type="time" name="hora_inicio" class="form-control rounded-3" required value="09:00">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small fw-bold">Hasta</label>
+                            <input type="time" name="hora_fin" class="form-control rounded-3" required value="18:00">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-success w-100 py-2 shadow-sm">
+                        <i class="bi bi-plus-lg me-2"></i> Guardar Horario
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Lista de Horarios -->
+        <div class="col-md-8">
+            <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+                <div class="card-header bg-white py-3 border-0">
+                    <h5 class="mb-0 fw-bold">Mi Disponibilidad Actual</h5>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="bg-light">
+                            <tr>
+                                <th class="ps-4">Día</th>
+                                <th>Entrada</th>
+                                <th>Salida</th>
+                                <th class="text-end pe-4">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for h in horarios %}
+                            <tr>
+                                <td class="ps-4 fw-bold text-primary">{{ dias_nombre[h.dia_semana] }}</td>
+                                <td><span
+                                        class="badge bg-light text-dark shadow-sm">{{ h.hora_inicio.strftime('%H:%M') }}</span>
+                                </td>
+                                <td><span
+                                        class="badge bg-light text-dark shadow-sm">{{ h.hora_fin.strftime('%H:%M') }}</span>
+                                </td>
+                                <td class="text-end pe-4">
+                                    <a href="{{ url_for('eliminar_horario', id=h.id) }}"
+                                        class="btn btn-sm btn-outline-danger border-0"
+                                        onclick="return confirm('¿Eliminar este bloque?')">
+                                        <i class="bi bi-trash"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="4" class="text-center py-5 text-muted">
+                                    <i class="bi bi-calendar-event display-6 d-block mb-3"></i>
+                                    No has definido horarios personalizados.<br>
+                                    <small>Se aplicará el horario por defecto: 09:00 - 18:00.</small>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

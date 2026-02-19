@@ -1,0 +1,443 @@
+/*
+ * TEMA - Centro de Fisioterapia
+ * Amigable para la vista, colores suaves
+ */
+
+:root {
+  --primary: #0d9488;
+  --primary-hover: #0e7c73;
+  --primary-light: rgba(13, 148, 136, 0.12);
+  --secondary: #0891b2;
+  --accent: #06b6d4;
+  --bg-body: linear-gradient(165deg, #f0fdfa 0%, #e0f2fe 50%, #f0f9ff 100%);
+  --glass-bg: rgba(255, 255, 255, 0.82);
+  --glass-border: rgba(255, 255, 255, 0.6);
+  --text: #1e293b;
+  --text-muted: #64748b;
+  --shadow-sm: 0 2px 10px rgba(15, 23, 42, 0.05);
+  --shadow-md: 0 10px 35px -10px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 20px 50px -15px rgba(15, 23, 42, 0.1);
+  --radius-sm: 12px;
+  --radius-md: 18px;
+  --radius-lg: 24px;
+  --transition: 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  --input-border: #e2e8f0;
+  --scrollbar: #cbd5e1;
+  --scrollbar-hover: #94a3b8;
+}
+
+/* ---------- Base: más amigable para la vista ---------- */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg-body);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-attachment: fixed;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  padding-top: 72px;
+}
+
+/* Contraste cómodo en párrafos */
+p {
+  line-height: 1.65;
+}
+
+/* ---------- Animaciones ---------- */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+.reveal { animation: fadeInUp 0.6s ease-out forwards; }
+.reveal-delay-1 { animation-delay: 0.15s; }
+.reveal-delay-2 { animation-delay: 0.3s; }
+.reveal-delay-3 { animation-delay: 0.45s; }
+.floating-animation { animation: float 4s ease-in-out infinite; }
+
+/* ---------- Navbar: fijo y superpuesto sobre el contenido (incl. imagen hero) ---------- */
+.navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1030;
+  background: var(--glass-bg) !important;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--glass-border);
+  padding: 0.75rem 0;
+  transition: var(--transition);
+  box-shadow: var(--shadow-sm);
+  overflow: visible;
+}
+
+.navbar-collapse {
+  overflow: visible;
+}
+
+/* Desplegable del usuario: por encima del navbar y clickeable */
+.navbar .dropdown-menu {
+  z-index: 1060;
+}
+
+.navbar .dropdown-toggle {
+  cursor: pointer;
+}
+
+/* Hero: margen negativo para “subir” y que el navbar se superponga a la imagen */
+.hero-section {
+  margin-top: -72px;
+  padding-top: 6rem;
+}
+
+.navbar-brand span {
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-weight: 700;
+  font-size: 1.35rem;
+}
+
+.nav-link {
+  font-weight: 500;
+  color: var(--text-muted) !important;
+  transition: color var(--transition);
+  position: relative;
+  padding: 0.5rem 0.75rem !important;
+  border-radius: var(--radius-sm);
+}
+
+.nav-link:hover {
+  color: var(--primary) !important;
+}
+
+.nav-link::after {
+  content: '';
+  position: absolute;
+  width: 0;
+  height: 2px;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--primary);
+  transition: width var(--transition);
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+.nav-link:hover::after {
+  width: calc(100% - 1rem);
+}
+
+/* En el dropdown-toggle no mostrar subrayado para no interferir con el clic */
+.nav-link.dropdown-toggle::after {
+  display: none;
+}
+
+/* ---------- Botones ---------- */
+.btn-success {
+  background: var(--primary);
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 1.4rem;
+  font-weight: 600;
+  box-shadow: 0 4px 14px rgba(13, 148, 136, 0.25);
+  transition: transform var(--transition), box-shadow var(--transition), background var(--transition);
+}
+
+.btn-success:hover {
+  background: var(--primary-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(13, 148, 136, 0.35);
+}
+
+.btn-primary {
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  transition: transform var(--transition), box-shadow var(--transition);
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+}
+
+.btn-outline-success {
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  border-width: 2px;
+  transition: all var(--transition);
+}
+
+.btn-outline-success:hover {
+  transform: translateY(-2px);
+}
+
+/* ---------- Cards ---------- */
+.card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  transition: transform var(--transition), box-shadow var(--transition);
+  color: var(--text);
+}
+
+.card:hover {
+  transform: translateY(-6px);
+  box-shadow: var(--shadow-lg);
+}
+
+.card-header {
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  border-bottom: 1px solid var(--glass-border);
+  font-weight: 600;
+  background: transparent;
+  color: var(--text);
+}
+
+/* ---------- Tarjetas de servicio ---------- */
+.card-servicio {
+  position: relative;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  padding: 1.5rem;
+  height: 100%;
+  background: var(--glass-bg);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-md);
+  transition: transform var(--transition), box-shadow var(--transition);
+}
+
+.card-servicio::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--primary), var(--secondary));
+  opacity: 0.9;
+}
+
+.card-servicio:hover {
+  transform: translateY(-8px);
+  box-shadow: var(--shadow-lg);
+}
+
+.card-servicio .card-content {
+  position: relative;
+  z-index: 1;
+  color: var(--text);
+}
+
+.card-servicio .card-content h5 {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.card-servicio .card-content .text-info,
+.card-servicio .card-content .fw-bold.text-info {
+  color: var(--primary) !important;
+}
+
+.card-servicio .card-content .text-muted {
+  color: var(--text-muted) !important;
+}
+
+.card-servicio .btn-outline-info {
+  border-color: var(--primary);
+  color: var(--primary);
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  transition: all var(--transition);
+}
+
+.card-servicio .btn-outline-info:hover {
+  background: var(--primary-light);
+  color: var(--primary-hover);
+  border-color: var(--primary-hover);
+}
+
+/* ---------- Modal Agendar (siempre oscuro para contraste del formulario) ---------- */
+.modal-content-original {
+  background: rgba(15, 23, 42, 0.95) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 28px !important;
+  padding: 2rem !important;
+  color: #fff !important;
+  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.5);
+}
+
+.title-original { color: #fff; font-size: 1.75rem; font-weight: 700; margin-bottom: 0.5rem; letter-spacing: -0.02em; }
+.message-original { color: rgba(255, 255, 255, 0.75); font-size: 0.95rem; margin-bottom: 1.75rem; }
+.form-original label { display: block; margin-bottom: 1.25rem; position: relative; }
+
+.input-original {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: var(--radius-sm) !important;
+  color: #fff !important;
+  padding: 0.9rem 1rem !important;
+  width: 100%;
+  transition: all var(--transition);
+}
+
+.input-original::placeholder { color: rgba(255, 255, 255, 0.4); }
+
+.input-original:focus {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.2) !important;
+  outline: none;
+}
+
+.submit-original {
+  width: 100%;
+  padding: 1rem 1.5rem;
+  margin-top: 0.5rem;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  border: none;
+  border-radius: var(--radius-sm);
+  color: #fff;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: transform var(--transition), box-shadow var(--transition);
+  box-shadow: 0 4px 20px rgba(13, 148, 136, 0.4);
+}
+
+.submit-original:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(13, 148, 136, 0.45);
+  color: #fff;
+}
+
+/* ---------- Formularios ---------- */
+.form-control {
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--input-border);
+  padding: 0.65rem 1rem;
+  transition: border-color var(--transition), box-shadow var(--transition);
+  background: var(--glass-bg);
+  color: var(--text);
+}
+
+.form-control:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+  outline: none;
+}
+
+.form-control::placeholder {
+  color: var(--text-muted);
+}
+
+/* ---------- Badges y alertas ---------- */
+.badge {
+  border-radius: 8px;
+  padding: 0.4em 0.75em;
+  font-weight: 600;
+  font-size: 0.75rem;
+}
+
+.alert {
+  border-radius: var(--radius-md);
+  border: none;
+  box-shadow: var(--shadow-sm);
+  animation: fadeInUp 0.4s ease-out;
+}
+
+/* ---------- Tablas ---------- */
+.table {
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  color: var(--text);
+}
+
+.table thead th {
+  background: var(--primary-light);
+  color: var(--text);
+  font-weight: 600;
+  border: none;
+  padding: 0.85rem 1rem;
+}
+
+.table td, .table th {
+  border-color: var(--glass-border);
+}
+
+.table-hover tbody tr:hover {
+  background: var(--primary-light);
+}
+
+/* ---------- Scrollbar ---------- */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-hover);
+}
+
+/* ---------- Utilidades ---------- */
+.text-gradient {
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.shadow-soft { box-shadow: var(--shadow-md); }
+.shadow-2xl { box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.2); }
+
+.hero-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0.15;
+  pointer-events: none;
+}
+
+/* Compatibilidad variables antiguas */
+:root {
+  --primary-color: #0d9488;
+  --primary-hover: #0f766e;
+  --secondary-color: #0891b2;
+  --bg-gradient: var(--bg-body);
+  --glass-bg: var(--glass-bg);
+  --glass-border: var(--glass-border);
+  --text-main: var(--text);
+  --shadow-premium: var(--shadow-md);
+}

@@ -1,47 +1,69 @@
 {% extends "base.html" %}
 
 {% block content %}
-<!-- Hero Section -->
-<div class="bg-light py-5 mb-5 border-bottom">
-    <div class="container py-5">
-        <div class="row align-items-center">
-            <div class="col-lg-6">
-                <h1 class="display-3 fw-bold text-success mb-3">Recupera tu Bienestar</h1>
-                <p class="lead text-muted mb-4">Especialistas en fisioterapia deportiva y rehabilitación con un enfoque
-                    personalizado para tu recuperación total.</p>
-                <div class="d-grid gap-2 d-md-flex">
+<!-- Hero: el navbar queda superpuesto sobre esta sección; padding-top para que el título no quede tapado -->
+<div class="hero-section py-5 mb-5 overflow-hidden position-relative">
+    <div class="position-absolute top-0 start-0 w-100 h-100" style="z-index: 0;">
+        <div class="hero-blob rounded-circle" style="width: 400px; height: 400px; top: -100px; left: -100px; background: var(--primary);"></div>
+        <div class="hero-blob rounded-circle" style="width: 300px; height: 300px; bottom: -50px; right: -50px; background: var(--secondary);"></div>
+    </div>
+
+    <div class="container py-lg-5 py-3 position-relative" style="z-index: 1;">
+        <div class="row align-items-center g-5">
+            <div class="col-lg-7 text-center text-lg-start reveal">
+                <span class="badge bg-success bg-opacity-25 text-success px-3 py-2 rounded-pill mb-3 fw-bold">Clínica de Rehabilitación Avanzada</span>
+                <h1 class="display-2 fw-bold mb-3 lh-sm">
+                    Tu <span class="text-gradient">Recuperación</span><br>Nuestra Pasión
+                </h1>
+                <p class="lead text-muted mb-4 fs-4 pe-lg-5">Especialistas en fisioterapia deportiva y tecnología de rehabilitación avanzada para una vuelta segura a tu mejor versión.</p>
+                <div class="d-flex flex-column flex-md-row justify-content-center justify-content-lg-start gap-3 reveal reveal-delay-1">
                     {% if current_user.is_authenticated %}
-                    <button type="button" class="btn btn-success btn-lg px-4 me-md-2" data-bs-toggle="modal" data-bs-target="#modalAgendar">Agendar Cita</button>
+                    <button type="button" class="btn btn-success btn-lg px-5 shadow-soft" data-bs-toggle="modal" data-bs-target="#modalAgendar">
+                        <i class="bi bi-calendar-check me-2"></i> Agendar Ahora
+                    </button>
                     {% else %}
-                    <a class="btn btn-success btn-lg px-4 me-md-2" href="{{ url_for('login', next=url_for('agendar')) }}">Agendar Cita (inicia sesión)</a>
+                    <a class="btn btn-success btn-lg px-5 shadow-soft" href="{{ url_for('login', next=url_for('agendar')) }}">
+                        <i class="bi bi-person-plus me-2"></i> Comenzar Recuperación
+                    </a>
                     {% endif %}
-                    <a href="{{ url_for('servicios') }}" class="btn btn-outline-secondary btn-lg px-4">Ver Servicios</a>
+                    <a href="{{ url_for('servicios') }}" class="btn btn-outline-dark btn-lg px-4 border-2 rounded-3">Explorar Tratamientos</a>
                 </div>
             </div>
-            <div class="col-lg-6 d-none d-lg-block">
-                <img src="{{ url_for('static', filename='images/Centro_de_fisioterapia.png') }}"
-                    class="img-fluid rounded-4 shadow-lg" alt="Fisioterapia">
+            <div class="col-lg-5 position-relative reveal reveal-delay-2">
+                <div class="p-3">
+                    <img src="{{ url_for('static', filename='images/Centro_de_fisioterapia.png') }}"
+                        class="img-fluid rounded-4 shadow-2xl floating-animation border border-4 border-white" alt="Fisioterapia">
+                    <div class="position-absolute bottom-0 start-0 bg-white p-3 rounded-4 shadow-soft ms-3 mb-4 d-none d-md-block border">
+                        <div class="d-flex align-items-center">
+                            <div class="bg-success bg-opacity-25 p-2 rounded-3 me-3">
+                                <i class="bi bi-people-fill text-success fs-4"></i>
+                            </div>
+                            <div>
+                                <h6 class="mb-0 fw-bold">+2,000</h6>
+                                <small class="text-muted">Pacientes Felices</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
 <div class="container pb-5">
-    <!-- Testimonios Section -->
+    <!-- Testimonios: cards con animación reveal -->
     {% if testimonios %}
     <section class="mb-5 py-5">
-        <div class="text-center mb-5">
+        <div class="text-center mb-5 reveal">
             <h2 class="fw-bold">Lo que dicen nuestros pacientes</h2>
             <p class="text-muted">La satisfacción de quienes confían en nosotros es nuestra mejor garantía.</p>
         </div>
         <div class="row g-4">
             {% for t in testimonios %}
-            <div class="col-md-4">
-                <div class="card h-100 border-0 shadow-sm rounded-4 text-center p-3">
+            <div class="col-md-4 reveal">
+                <div class="card h-100 border-0 text-center p-4">
                     <div class="card-body">
-                        <div class="text-warning mb-3">
-                            {% for i in range(t.estrellas) %}★{% endfor %}
-                        </div>
+                        <div class="text-warning mb-3">{% for i in range(t.estrellas) %}★{% endfor %}</div>
                         <p class="fst-italic text-muted mb-3">"{{ t.contenido }}"</p>
                         <h6 class="fw-bold mb-0">{{ t.nombre_cliente }}</h6>
                     </div>
@@ -52,16 +74,16 @@
     </section>
     {% endif %}
 
-    <!-- FAQ Section -->
+    <!-- FAQ: acordeón con bordes del tema -->
     {% if faqs %}
     <section class="py-5">
         <div class="row justify-content-center">
             <div class="col-lg-8">
-                <div class="text-center mb-5">
+                <div class="text-center mb-5 reveal">
                     <h2 class="fw-bold">Preguntas Frecuentes</h2>
                     <p class="text-muted">Resolvemos tus dudas antes de tu primera sesión.</p>
                 </div>
-                <div class="accordion accordion-flush shadow-sm rounded-4 overflow-hidden" id="faqAccordion">
+                <div class="accordion accordion-flush shadow-soft rounded-4 overflow-hidden reveal" id="faqAccordion">
                     {% for faq in faqs %}
                     <div class="accordion-item">
                         <h2 class="accordion-header">

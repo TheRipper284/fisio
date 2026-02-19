@@ -1,39 +1,35 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container mt-5">
+<div class="container py-5">
     <div class="row justify-content-center">
-        <div class="col-md-5">
-            <div class="card shadow-lg border-0 rounded-lg">
+        <div class="col-md-5 reveal">
+            <div class="card shadow-soft border-0">
                 <div class="card-header bg-primary text-white text-center py-4">
-                    <h3 class="font-weight-light my-2">Iniciar Sesión</h3>
+                    <h3 class="fw-bold mb-0">Iniciar Sesión</h3>
                 </div>
                 <div class="card-body p-5">
                     <form method="POST">
                         {% if next %}
                         <input type="hidden" name="next" value="{{ next }}">
                         {% endif %}
-                        <div class="form-group mb-3">
-                            <label class="small mb-1" for="email">Correo Electrónico</label>
-                            <input class="form-control py-4" id="email" name="email" type="email"
-                                placeholder="ejemplo@correo.com" required />
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold" for="email">Correo Electrónico</label>
+                            <input class="form-control py-3" id="email" name="email" type="email" placeholder="ejemplo@correo.com" required />
                         </div>
-                        <div class="form-group mb-4">
-                            <label class="small mb-1" for="password">Contraseña</label>
-                            <input class="form-control py-4" id="password" name="password" type="password"
-                                placeholder="Ingresa tu contraseña" required />
+                        <div class="mb-4">
+                            <label class="form-label small fw-bold" for="password">Contraseña</label>
+                            <input class="form-control py-3" id="password" name="password" type="password" placeholder="Ingresa tu contraseña" required />
                         </div>
-                        <div class="d-grid gap-2">
-                            <button class="btn btn-primary btn-block py-2" type="submit">Ingresar</button>
+                        <div class="d-grid">
+                            <button class="btn btn-success py-3 fw-bold" type="submit">Ingresar</button>
                         </div>
                     </form>
                 </div>
-                <div class="card-footer text-center py-3">
-                    <div class="small"><a href="{{ url_for('registro') }}">¿No tienes cuenta? ¡Regístrate aquí!</a>
-                    </div>
-                    <div class="small text-muted mt-2">Centro de Fisioterapia - Acceso Privado</div>
+                <div class="card-footer text-center py-3 bg-transparent border-0">
+                    <div class="small"><a href="{{ url_for('registro') }}" class="text-primary fw-bold">¿No tienes cuenta? ¡Regístrate aquí!</a></div>
+                    <div class="small text-muted mt-2">Centro de Fisioterapia — Acceso Privado</div>
                 </div>
-
             </div>
         </div>
     </div>

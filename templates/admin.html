@@ -52,7 +52,12 @@
                 <tr>
                     <td>{{ cita.id }}</td>
                     <td>{{ cita.cliente.nombre }}</td>
-                    <td>{{ cita.cliente.telefono }}</td>
+                    <td>
+                        <a href="https://wa.me/{{ cita.cliente.telefono|replace(' ', '')|replace('-', '')|replace('+', '') }}?text=Hola%20{{ cita.cliente.nombre }},%20te%20escribo%20del%20Centro%20de%20Fisioterapia%20para%20recordarte%20tu%20cita%20de%20{{ cita.servicio.nombre }}%20el%20día%20{{ cita.fecha_inicio.strftime('%d/%m') }}%20a%20las%20{{ cita.fecha_inicio.strftime('%H:%M') }}."
+                            target="_blank" class="text-success text-decoration-none fw-bold">
+                            <i class="bi bi-whatsapp me-1"></i> {{ cita.cliente.telefono }}
+                        </a>
+                    </td>
                     <td>{{ cita.servicio.nombre }}</td>
                     <td>
                         {{ cita.fecha_inicio.strftime('%d/%m %H:%M') }} - {{ cita.fecha_fin.strftime('%H:%M') }}
