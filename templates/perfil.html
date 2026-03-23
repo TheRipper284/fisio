@@ -7,7 +7,7 @@
             <div class="card shadow border-0 rounded-4">
                 <div class="card-header bg-success text-white p-4 rounded-top-4">
                     <h3 class="mb-0">Mi Perfil</h3>
-                    <p class="mb-0 opcity-75">Gestiona tu información personal y cuenta.</p>
+                    <p class="mb-0 opacity-75">Gestiona tu información personal y cuenta.</p>
                 </div>
                 <div class="card-body p-4">
                     <form action="{{ url_for('perfil') }}" method="POST" enctype="multipart/form-data">
@@ -39,9 +39,9 @@
                             </div>
                             <div class="col-md-6">
                                 <label for="email" class="form-label fw-bold">Correo electrónico</label>
-                                <input type="email" class="form-control bg-light" value="{{ current_user.email }}"
-                                    readonly disabled>
-                                <div class="form-text">El correo no puede ser modificado.</div>
+                                <input type="email" class="form-control" name="email" id="email"
+                                    value="{{ current_user.email }}" required>
+                                <div class="form-text">Si cambias tu correo, lo usarás para iniciar sesión.</div>
                             </div>
                             <div class="col-md-6">
                                 <label for="telefono" class="form-label fw-bold">Teléfono</label>

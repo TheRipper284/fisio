@@ -35,6 +35,7 @@
                                 <span class="badge 
                                 {% if usuario.rol == 'admin' %} bg-danger
                                 {% elif usuario.rol == 'empleado' %} bg-info
+                                {% elif usuario.rol == 'recepcionista' %} bg-warning text-dark
                                 {% else %} bg-secondary
                                 {% endif %}">
                                     {{ usuario.rol|capitalize }}

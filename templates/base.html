@@ -60,6 +60,8 @@
               <span class="badge bg-dark ms-2">Admin</span>
               {% elif current_user.rol == 'empleado' %}
               <span class="badge bg-primary ms-2">Especialista</span>
+              {% elif current_user.rol == 'recepcionista' %}
+              <span class="badge bg-warning text-dark ms-2">Recepción</span>
               {% else %}
               <span class="badge bg-success ms-2">Cliente</span>
               {% endif %}
@@ -90,6 +92,10 @@
               <li class="dropdown-header text-muted small">Especialista</li>
               <li><a class="dropdown-item fw-bold" href="{{ url_for('empleado_dashboard') }}"><i
                     class="bi bi-calendar-day me-2"></i>Mi Agenda</a></li>
+              {% elif current_user.rol == 'recepcionista' %}
+              <li class="dropdown-header text-muted small">Recepción</li>
+              <li><a class="dropdown-item fw-bold" href="{{ url_for('recepcion_dashboard') }}"><i
+                    class="bi bi-calendar-check me-2"></i>Citas y Pagos</a></li>
               {% else %}
               <li class="dropdown-header text-muted small">Cliente</li>
               <li><a class="dropdown-item fw-bold" href="{{ url_for('cliente_dashboard') }}"><i
@@ -138,14 +144,14 @@
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content modal-content-original">
         <div class="d-flex justify-content-end">
-          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
 
         <form class="form-original" action="{{ url_for('agendar') }}" method="POST" id="formAgendar">
           <p class="title-original">Agendar Cita</p>
           <p class="message-original">Reserva tu cita con nuestros especialistas.</p>
 
-          {% if current_user.rol in ['admin', 'empleado'] %}
+          {% if current_user.rol in ['admin', 'empleado', 'recepcionista'] %}
           <!-- Datos del Paciente (Solo para Staff) -->
           <label>
             <input class="input-original" type="text" name="nombre" placeholder=" " required>
@@ -295,11 +301,17 @@
     if (modalAgendar) {
       modalAgendar.addEventListener('show.bs.modal', function (event) {
         const button = event.relatedTarget; // Botón que activó el modal
-        const serviceId = button.getAttribute('data-service-id');
+        const serviceId = button ? button.getAttribute('data-service-id') : null;
 
         if (serviceId) {
           servicioSelect.value = serviceId;
-          actualizarSlots(); // Cargar horas automáticamente para ese servicio
+          // Importante: desde tarjetas debemos cargar especialistas de ese servicio.
+          cargarEspecialistas();
+        } else {
+          // Si se abre desde navbar u otro botón, reiniciar estado del especialista.
+          especialistaSelect.value = '';
+          labelEspecialista.style.display = 'none';
+          actualizarSlots();
         }
       });
     }

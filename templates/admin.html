@@ -4,11 +4,19 @@
 <div class="container py-4">
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
         <div>
-            <a href="{{ url_for('admin_inicio') }}" class="btn btn-outline-secondary btn-sm mb-2">
-                <i class="bi bi-arrow-left me-1"></i> Panel de Admin
+            <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary btn-sm mb-2">
+                <i class="bi bi-arrow-left me-1"></i> Volver al panel
             </a>
-            <h2 class="mb-0">Citas y Servicios</h2>
-            <p class="text-muted small mb-0">Gestiona citas, pagos y servicios del centro.</p>
+            <h2 class="mb-0">
+                {% if current_user.rol == 'recepcionista' %}Panel de Recepción{% else %}Citas y Servicios{% endif %}
+            </h2>
+            <p class="text-muted small mb-0">
+                {% if current_user.rol == 'recepcionista' %}
+                Gestiona citas y pagos del centro.
+                {% else %}
+                Gestiona citas, pagos y servicios del centro.
+                {% endif %}
+            </p>
         </div>
     </div>
 
@@ -101,8 +109,10 @@
                                 class="btn btn-outline-success" title="Completar">★</a>
                             <a href="{{ url_for('actualizar_cita_status', id=cita.id, nuevo_estado='Cancelada') }}"
                                 class="btn btn-outline-danger" title="Cancelar">✕</a>
+                            {% if current_user.rol == 'admin' %}
                             <a href="{{ url_for('ver_paciente', id=cita.cliente_id) }}" class="btn btn-info text-white"
                                 title="Ver Expediente">📁</a>
+                            {% endif %}
                             {% if cita.pagado %}
                             <a href="{{ url_for('generar_recibo', id=cita.id) }}" class="btn btn-dark"
                                 title="Generar Recibo">
@@ -122,6 +132,7 @@
     <p>No hay citas registradas.</p>
     {% endif %}
 
+    {% if current_user.rol == 'admin' %}
     <hr class="my-5">
 
     <!-- ========================= -->
@@ -193,6 +204,7 @@
     <p>No hay servicios registrados.</p>
     {% endif %}
 
+    {% endif %}
 </div>
 
 <script>

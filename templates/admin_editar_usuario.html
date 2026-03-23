@@ -24,6 +24,8 @@
                                     </option>
                                     <option value="empleado" {% if usuario.rol == 'empleado' %}selected{% endif %}>
                                         Empleado (Fisio)</option>
+                                    <option value="recepcionista" {% if usuario.rol == 'recepcionista' %}selected{% endif %}>
+                                        Recepcionista</option>
                                     <option value="admin" {% if usuario.rol == 'admin' %}selected{% endif %}>
                                         Administrador</option>
                                 </select>

@@ -50,25 +50,58 @@ p {
 
 /* ---------- Animaciones ---------- */
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(24px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-10px);
+  }
 }
 
-.reveal { animation: fadeInUp 0.6s ease-out forwards; }
-.reveal-delay-1 { animation-delay: 0.15s; }
-.reveal-delay-2 { animation-delay: 0.3s; }
-.reveal-delay-3 { animation-delay: 0.45s; }
-.floating-animation { animation: float 4s ease-in-out infinite; }
+.reveal {
+  animation: fadeInUp 0.6s ease-out forwards;
+}
+
+.reveal-delay-1 {
+  animation-delay: 0.15s;
+}
+
+.reveal-delay-2 {
+  animation-delay: 0.3s;
+}
+
+.reveal-delay-3 {
+  animation-delay: 0.45s;
+}
+
+.floating-animation {
+  animation: float 4s ease-in-out infinite;
+}
 
 /* ---------- Navbar: fijo y superpuesto sobre el contenido (incl. imagen hero) ---------- */
 .navbar {
@@ -279,60 +312,175 @@ p {
 }
 
 /* ---------- Modal Agendar (siempre oscuro para contraste del formulario) ---------- */
+/* ---------- Modal Agendar (Estilo Glassmorphic consistente) ---------- */
+/* ============================= */
+/* OVERLAY OSCURO CON BLUR */
+/* ============================= */
+.modal-backdrop.show {
+  background: rgba(7, 24, 46, 0.65) !important;
+  backdrop-filter: blur(6px);
+}
+
+
+/* ============================= */
+/* CONTENEDOR PRINCIPAL MODAL */
+/* ============================= */
 .modal-content-original {
-  background: rgba(15, 23, 42, 0.95) !important;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  border-radius: 28px !important;
-  padding: 2rem !important;
-  color: #fff !important;
-  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.5);
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 24px;
+  padding: 2.5rem;
+  color: var(--text);
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.25);
+  animation: modalFade 0.4s ease;
 }
 
-.title-original { color: #fff; font-size: 1.75rem; font-weight: 700; margin-bottom: 0.5rem; letter-spacing: -0.02em; }
-.message-original { color: rgba(255, 255, 255, 0.75); font-size: 0.95rem; margin-bottom: 1.75rem; }
-.form-original label { display: block; margin-bottom: 1.25rem; position: relative; }
+/* Animación entrada */
+@keyframes modalFade {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
 
+
+/* ============================= */
+/* TITULO Y MENSAJE */
+/* ============================= */
+.title-original {
+  font-size: 2rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 0.75rem;
+}
+
+.message-original {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  margin-bottom: 2rem;
+}
+
+
+/* ============================= */
+/* FORMULARIO */
+/* ============================= */
+.form-original label {
+  display: block;
+  margin-bottom: 1.8rem;
+  position: relative;
+  height: 3.8rem;
+}
+
+
+/* ============================= */
+/* INPUTS */
+/* ============================= */
 .input-original {
-  background: rgba(255, 255, 255, 0.06) !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  border-radius: var(--radius-sm) !important;
-  color: #fff !important;
-  padding: 0.9rem 1rem !important;
   width: 100%;
-  transition: all var(--transition);
+  height: 100%;
+  padding: 1.4rem 1rem 0.6rem 1rem;
+  background: rgba(255, 255, 255, 0.9);
+  border: 2px solid transparent;
+  border-radius: 14px;
+  font-size: 1rem;
+  font-weight: 500;
+  transition: all 0.25s ease;
+  appearance: none;
 }
 
-.input-original::placeholder { color: rgba(255, 255, 255, 0.4); }
+/* Hover */
+.input-original:hover {
+  border-color: var(--secondary);
+  box-shadow: 0 6px 18px rgba(13, 148, 136, 0.1);
+}
 
+/* Focus */
 .input-original:focus {
-  background: rgba(255, 255, 255, 0.1) !important;
-  border-color: var(--accent) !important;
-  box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.2) !important;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(13, 148, 136, 0.15);
+  background: #fff;
   outline: none;
 }
 
+
+/* ============================= */
+/* LABEL FLOTANTE */
+/* ============================= */
+.form-original label span {
+  position: absolute;
+  left: 1rem;
+  top: 1.2rem;
+  color: var(--text-muted);
+  transition: all 0.2s ease;
+  font-size: 0.95rem;
+  pointer-events: none;
+}
+
+.input-original:focus + span,
+.input-original:not(:placeholder-shown) + span {
+  transform: translateY(-0.9rem) scale(0.85);
+  color: var(--primary);
+  font-weight: 600;
+}
+
+/* Para select (siempre flotante) */
+select.input-original + span {
+  transform: translateY(-0.9rem) scale(0.85);
+  color: var(--primary);
+  font-weight: 600;
+}
+
+
+/* ============================= */
+/* BOTÓN SUBMIT */
+/* ============================= */
 .submit-original {
   width: 100%;
-  padding: 1rem 1.5rem;
+  padding: 1.1rem;
   margin-top: 0.5rem;
-  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  border-radius: 16px;
   border: none;
-  border-radius: var(--radius-sm);
-  color: #fff;
   font-weight: 700;
   font-size: 1rem;
+  color: white;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  box-shadow: 0 10px 25px rgba(13, 148, 136, 0.35);
+  transition: all 0.3s ease;
   cursor: pointer;
-  transition: transform var(--transition), box-shadow var(--transition);
-  box-shadow: 0 4px 20px rgba(13, 148, 136, 0.4);
 }
 
 .submit-original:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 28px rgba(13, 148, 136, 0.45);
-  color: #fff;
+  transform: translateY(-3px);
+  box-shadow: 0 15px 35px rgba(13, 148, 136, 0.5);
 }
+
+.submit-original:active {
+  transform: scale(0.98);
+}
+
+
+/* ============================= */
+/* RESPONSIVE */
+/* ============================= */
+@media (max-width: 576px) {
+  .modal-content-original {
+    padding: 1.8rem;
+    border-radius: 18px;
+  }
+
+  .title-original {
+    font-size: 1.6rem;
+  }
+}
+
 
 /* ---------- Formularios ---------- */
 .form-control {
@@ -384,7 +532,8 @@ p {
   padding: 0.85rem 1rem;
 }
 
-.table td, .table th {
+.table td,
+.table th {
   border-color: var(--glass-border);
 }
 
@@ -419,8 +568,13 @@ p {
   -webkit-text-fill-color: transparent;
 }
 
-.shadow-soft { box-shadow: var(--shadow-md); }
-.shadow-2xl { box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.2); }
+.shadow-soft {
+  box-shadow: var(--shadow-md);
+}
+
+.shadow-2xl {
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.2);
+}
 
 .hero-blob {
   position: absolute;

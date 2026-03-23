@@ -84,6 +84,33 @@
 
         <!-- Sidebar -->
         <div class="col-md-4">
+            <div class="card shadow-sm border-0 rounded-4 mb-4">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0"><i class="bi bi-chat-square-quote me-2"></i>Dejar testimonio</h5>
+                </div>
+                <div class="card-body">
+                    <form action="{{ url_for('crear_testimonio_cliente') }}" method="POST">
+                        <div class="mb-2">
+                            <label for="estrellas" class="form-label small fw-bold">Calificación</label>
+                            <select class="form-select form-select-sm" id="estrellas" name="estrellas" required>
+                                <option value="5" selected>5 estrellas</option>
+                                <option value="4">4 estrellas</option>
+                                <option value="3">3 estrellas</option>
+                                <option value="2">2 estrellas</option>
+                                <option value="1">1 estrella</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="contenido_testimonio" class="form-label small fw-bold">Tu experiencia</label>
+                            <textarea id="contenido_testimonio" name="contenido" class="form-control form-control-sm"
+                                rows="3" placeholder="Cuéntanos cómo te fue en tu tratamiento..." required></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-outline-success btn-sm w-100">Enviar testimonio</button>
+                        <p class="text-muted small mt-2 mb-0">Se publica cuando sea aprobado por administración.</p>
+                    </form>
+                </div>
+            </div>
+
             <!-- Diagnósticos -->
             <div class="card shadow-sm border-0 rounded-4 mb-4">
                 <div class="card-header bg-success text-white py-3">
