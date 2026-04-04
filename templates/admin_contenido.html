@@ -69,6 +69,7 @@
 <div class="modal fade" id="modalFAQ" tabindex="-1">
     <div class="modal-dialog">
         <form action="{{ url_for('nueva_faq') }}" method="POST" class="modal-content">
+            {% include '_csrf.html' %}
             <div class="modal-header">
                 <h5 class="modal-title">Nueva Pregunta Frecuente</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>

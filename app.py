@@ -1,4 +1,5 @@
 import os
+from dotenv import load_dotenv
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, date, timedelta 
@@ -6,6 +7,7 @@ from flask_migrate import Migrate
 from flask_bcrypt import Bcrypt
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from flask_mail import Mail, Message
+from flask_wtf.csrf import CSRFProtect
 from werkzeug.utils import secure_filename
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
@@ -13,14 +15,17 @@ from reportlab.lib import colors
 import io
 import stripe
 
-# --- CONFIGURACIÓN DE STRIPE ---
-stripe.api_key = os.environ.get('STRIPE_SECRET_KEY', 'sk_test_51...tus_llaves_aqui')
-STRIPE_PUBLIC_KEY = os.environ.get('STRIPE_PUBLIC_KEY', 'pk_test_51...tus_llaves_aqui')
+load_dotenv()
 
-
+# --- CONFIGURACIÓN DE STRIPE (solo variables de entorno; ver .env.example) ---
+stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
+STRIPE_PUBLIC_KEY = os.environ.get('STRIPE_PUBLIC_KEY', '')
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'dev-key-fisio-123'
+app.config['SECRET_KEY'] = os.environ.get(
+    'SECRET_KEY',
+    'dev-only-generate-a-strong-SECRET_KEY-for-production',
+)
 # Usar ruta absoluta para evitar errores en Windows
 basedir = os.path.abspath(os.path.dirname(__file__))
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'database', 'citas.db')
@@ -52,6 +57,8 @@ ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg', 'gif'}
 
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
+
+csrf = CSRFProtect(app)
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -377,7 +384,14 @@ def crear_sesion_pago(cita_id):
     cita = Cita.query.get_or_404(cita_id)
     if cita.cliente_id != current_user.id:
         return jsonify({"error": "No autorizado"}), 403
-    
+
+    if not stripe.api_key:
+        flash(
+            "Los pagos con tarjeta no están configurados (falta STRIPE_SECRET_KEY en el entorno).",
+            "warning",
+        )
+        return redirect(url_for('cliente_dashboard'))
+
     try:
         checkout_session = stripe.checkout.Session.create(
             payment_method_types=['card'],
@@ -406,8 +420,8 @@ def crear_sesion_pago(cita_id):
 def pago_exitoso(cita_id):
     session_id = request.args.get('session_id')
     cita = Cita.query.get_or_404(cita_id)
-    
-    if session_id:
+
+    if session_id and stripe.api_key:
         session = stripe.checkout.Session.retrieve(session_id)
         cita.pagado = True
         cita.stripe_id = session.id

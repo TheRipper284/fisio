@@ -1,0 +1,4 @@
+.env
+global_error.txt
+__pycache__/
+*.pyc

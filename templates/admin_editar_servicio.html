@@ -9,6 +9,7 @@
                     <h2 class="mb-4">Editar Servicio</h2>
 
                     <form method="POST">
+                        {% include '_csrf.html' %}
                         <div class="mb-3">
                             <label class="form-label">Nombre del Servicio</label>
                             <input type="text" name="nombre" class="form-control" value="{{ servicio.nombre }}"

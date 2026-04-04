@@ -90,6 +90,7 @@
                 </div>
                 <div class="card-body">
                     <form action="{{ url_for('crear_testimonio_cliente') }}" method="POST">
+                        {% include '_csrf.html' %}
                         <div class="mb-2">
                             <label for="estrellas" class="form-label small fw-bold">Calificación</label>
                             <select class="form-select form-select-sm" id="estrellas" name="estrellas" required>

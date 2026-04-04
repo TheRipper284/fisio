@@ -108,6 +108,7 @@
                     <h5 class="text-danger"><i class="bi bi-database-dash me-2"></i>Limpiar base de datos</h5>
                     <p class="text-muted small mb-3">Elimina todos los datos (citas, mensajes, pacientes, empleados, contenido) y deja solo al administrador. Se restauran servicios y FAQs de ejemplo.</p>
                     <form action="{{ url_for('limpiar_base_datos') }}" method="POST" class="d-inline" onsubmit="return confirm('¿Estás seguro? Se borrarán TODOS los datos excepto tu usuario admin. Esta acción no se puede deshacer.');">
+                        {% include '_csrf.html' %}
                         <button type="submit" class="btn btn-outline-danger">Limpiar todo (mantener solo admin)</button>
                     </form>
                 </div>

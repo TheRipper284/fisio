@@ -4,6 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
   <title>Centro de Fisioterapia</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -148,6 +149,7 @@
         </div>
 
         <form class="form-original" action="{{ url_for('agendar') }}" method="POST" id="formAgendar">
+          {% include '_csrf.html' %}
           <p class="title-original">Agendar Cita</p>
           <p class="message-original">Reserva tu cita con nuestros especialistas.</p>
 

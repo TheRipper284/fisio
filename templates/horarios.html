@@ -20,6 +20,7 @@
             <div class="card border-0 shadow-lg p-4" style="border-radius: 25px;">
                 <h5 class="fw-bold mb-4">Añadir Jornada</h5>
                 <form action="{{ url_for('gestionar_horarios') }}" method="POST">
+                    {% include '_csrf.html' %}
                     <div class="mb-3">
                         <label class="form-label small fw-bold">Día de la Semana</label>
                         <select name="dia_semana" class="form-select rounded-3" required>

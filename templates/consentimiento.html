@@ -45,6 +45,7 @@
                     </div>
 
                     <form action="{{ url_for('consentimiento') }}" method="POST">
+                        {% include '_csrf.html' %}
                         <div class="form-check mb-4 p-3 border rounded-3 bg-light d-flex align-items-center">
                             <input class="form-check-input ms-0 me-3" type="checkbox" id="checkAcepto" required
                                 style="width: 25px; height: 25px;">

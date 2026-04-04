@@ -11,6 +11,7 @@
                 </div>
                 <div class="card-body p-4">
                     <form action="{{ url_for('perfil') }}" method="POST" enctype="multipart/form-data">
+                        {% include '_csrf.html' %}
                         <div class="row mb-4 align-items-center">
                             <div class="col-auto">
                                 {% if current_user.foto_perfil %}

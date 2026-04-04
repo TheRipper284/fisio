@@ -10,6 +10,7 @@
                     <p class="text-center text-muted mb-4">Crea una cuenta para gestionar tus citas cómodamente.</p>
 
                     <form method="POST">
+                        {% include '_csrf.html' %}
                         <div class="mb-3">
                             <label class="form-label small fw-bold">Nombre Completo</label>
                             <input type="text" name="nombre" class="form-control" placeholder="Ej. Juan Pérez" required>

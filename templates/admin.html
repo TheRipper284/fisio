@@ -83,6 +83,7 @@
                     </td>
                     <td>
                         <form action="{{ url_for('actualizar_pago', id=cita.id) }}" method="POST" class="d-inline">
+                            {% include '_csrf.html' %}
                             <select name="metodo_pago" class="form-select form-select-sm d-inline-block"
                                 style="width: auto; min-width: 7rem;">
                                 <option value="">— Método —</option>
@@ -142,6 +143,7 @@
     <h4>Gestionar Servicios</h4>
 
     <form action="{{ url_for('agregar_servicio') }}" method="POST" class="row g-3 mb-4">
+        {% include '_csrf.html' %}
         <div class="col-md-2">
             <input type="text" name="nombre" class="form-control" placeholder="Nombre" required>
         </div>

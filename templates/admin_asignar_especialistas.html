@@ -12,6 +12,7 @@
                     <p class="text-muted">Selecciona los empleados que pueden realizar este servicio.</p>
 
                     <form method="POST">
+                        {% include '_csrf.html' %}
                         <div class="row g-3">
                             {% for empleado in empleados %}
                             <div class="col-md-6">
