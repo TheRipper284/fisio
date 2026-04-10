@@ -28,7 +28,16 @@ app.config['SECRET_KEY'] = os.environ.get(
 )
 # Usar ruta absoluta para evitar errores en Windows
 basedir = os.path.abspath(os.path.dirname(__file__))
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'database', 'citas.db')
+database_url = os.environ.get('DATABASE_URL')
+if database_url:
+    # Render/heroku a veces usan postgres://; SQLAlchemy 2 espera postgresql://
+    if database_url.startswith('postgres://'):
+        database_url = database_url.replace('postgres://', 'postgresql://', 1)
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+else:
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(
+        basedir, 'database', 'citas.db'
+    )
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)

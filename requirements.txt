@@ -8,3 +8,5 @@ Flask-WTF>=1.2.0,<2
 python-dotenv>=1.0.0,<2
 reportlab>=4.0.0,<5
 stripe>=10.0.0,<15
+gunicorn>=22.0.0,<24
+psycopg2-binary>=2.9.9,<3

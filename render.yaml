@@ -1,0 +1,37 @@
+# Blueprint Render (plan gratuito): servicio web + PostgreSQL.
+# Debe estar en la RAÍZ del repositorio Git que conectes a Render.
+#
+# Monorepo (repo raíz = carpeta padre de fisio_web): mueve este archivo a esa raíz y añade
+#   rootDir: fisio_web
+# como propiedad del servicio web (mismo nivel que "type: web").
+#
+# Manual sin Blueprint: crea Web Service + Postgres en dashboard; Build = pip install -r requirements.txt;
+# Start = bash scripts/render_start.sh; Root Directory = fisio_web si aplica; añade DATABASE_URL del Postgres.
+#
+# https://render.com/docs/deploy-flask
+
+version: "1"
+
+databases:
+  - name: fisio-db
+    plan: free
+    databaseName: fisio
+
+services:
+  - type: web
+    name: fisio-web
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: bash scripts/render_start.sh
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.6"
+      - key: FLASK_APP
+        value: app.py
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: fisio-db
+          property: connectionString
