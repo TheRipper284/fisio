@@ -5,9 +5,6 @@
 #   rootDir: fisio_web
 # como propiedad del servicio web (mismo nivel que "type: web").
 #
-# Manual sin Blueprint: crea Web Service + Postgres en dashboard; Build = pip install -r requirements.txt;
-# Start = bash scripts/render_start.sh; Root Directory = fisio_web si aplica; añade DATABASE_URL del Postgres.
-#
 # https://render.com/docs/deploy-flask
 
 version: "1"
@@ -23,11 +20,15 @@ services:
     runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: bash scripts/render_start.sh
-    healthCheckPath: /
+    # Sin bash scripts (evita CRLF / shebang roto en Windows). FLASK_APP viene de envVars.
+    preDeployCommand: "flask db upgrade && flask seed"
+    startCommand: "gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 180 --graceful-timeout 30 --access-logfile - --error-logfile - --forwarded-allow-ips='*'"
+    healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
         value: "3.11.6"
+      - key: PYTHONUNBUFFERED
+        value: "1"
       - key: FLASK_APP
         value: app.py
       - key: SECRET_KEY

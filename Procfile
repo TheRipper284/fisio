@@ -1,1 +1,1 @@
-web: bash scripts/render_start.sh
+web: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 180 --graceful-timeout 30 --access-logfile - --error-logfile - --forwarded-allow-ips='*'

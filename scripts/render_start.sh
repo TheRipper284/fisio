@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-# Arranque en Render: migraciones Alembic + Gunicorn en $PORT
+# Respaldo local / Docker: mismo comando que render.yaml (startCommand).
 set -euo pipefail
-export FLASK_APP=app.py
-flask db upgrade
-flask seed
-exec gunicorn app:app --bind "0.0.0.0:${PORT:-10000}" --workers 1 --timeout 120
+exec gunicorn app:app --bind "0.0.0.0:${PORT:-5000}" --workers 1 --timeout 180 --graceful-timeout 30 --access-logfile - --error-logfile - --forwarded-allow-ips='*'

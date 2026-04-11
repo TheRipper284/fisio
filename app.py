@@ -9,6 +9,7 @@ from flask_login import LoginManager, UserMixin, login_user, logout_user, login_
 from flask_mail import Mail, Message
 from flask_wtf.csrf import CSRFProtect
 from werkzeug.utils import secure_filename
+from werkzeug.middleware.proxy_fix import ProxyFix
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
@@ -38,6 +39,13 @@ if database_url:
     # Render/heroku a veces usan postgres://; SQLAlchemy 2 espera postgresql://
     if database_url.startswith('postgres://'):
         database_url = database_url.replace('postgres://', 'postgresql://', 1)
+    # Render: SSL suele ser necesario. Si falla la conexión, define DATABASE_SSL_DISABLE=1 en el dashboard.
+    if (
+        database_url.startswith('postgresql')
+        and 'sslmode=' not in database_url
+        and os.environ.get('DATABASE_SSL_DISABLE', '').lower() not in ('1', 'true', 'yes')
+    ):
+        database_url += '&sslmode=require' if '?' in database_url else '?sslmode=require'
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 else:
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(
@@ -73,6 +81,10 @@ if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
 csrf = CSRFProtect(app)
+# Tras el proxy inverso de Render (HTTPS, host, etc.)
+app.wsgi_app = ProxyFix(
+    app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1, x_prefix=1
+)
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -327,6 +339,12 @@ with app.app_context():
 
         except Exception as e:
             print(f"Error inicializando DB: {e}")
+
+@app.route("/health")
+def health():
+    """Sin consultas a BD: usado por Render para health checks."""
+    return "ok", 200, {"Content-Type": "text/plain; charset=utf-8"}
+
 
 @app.route("/favicon.ico")
 def favicon():
