@@ -248,41 +248,70 @@ class Archivo(db.Model):
 
 
 
-# Crear base de datos e insertar datos iniciales
+def seed_demo_data():
+    """Servicios, admin y datos demo si la BD está vacía. Úsalo tras migraciones (PostgreSQL)."""
+    if Servicio.query.count() != 0:
+        return
+    servicios_iniciales = [
+        Servicio(nombre="Fisioterapia Deportiva", descripcion="Tratamiento de lesiones deportivas y mejora del rendimiento.", precio=500.0, duracion_minutos=60),
+        Servicio(nombre="Masaje Terapéutico", descripcion="Masaje para aliviar tensión muscular y estrés.", precio=400.0, duracion_minutos=45),
+        Servicio(nombre="Rehabilitación Post-Operatoria", descripcion="Cuidado especializado después de una cirugía.", precio=600.0, duracion_minutos=60)
+    ]
+    for s in servicios_iniciales:
+        db.session.add(s)
+    if Usuario.query.filter_by(rol="admin").count() == 0:
+        hashed_pw = bcrypt.generate_password_hash("admin123").decode('utf-8')
+        admin = Usuario(nombre="Admin", email="admin@fisio.com", rol="admin", telefono="0000000000", password_hash=hashed_pw)
+        db.session.add(admin)
+    if FAQ.query.count() == 0:
+        db.session.add(FAQ(pregunta="¿Necesito orden médica para asistir?", respuesta="No es obligatorio, pero si vienes por rehabilitación post-lesión es recomendable traer estudios o indicaciones de tu médico."))
+        db.session.add(FAQ(pregunta="¿Cuánto dura una sesión?", respuesta="Depende del servicio: entre 45 y 60 minutos. Puedes ver la duración en cada servicio."))
+    if Testimonio.query.count() == 0:
+        db.session.add(Testimonio(nombre_cliente="María G.", contenido="Excelente atención y muy buenos resultados con la rehabilitación.", estrellas=5, activo=True))
+    db.session.commit()
+
+
+@app.cli.command("seed")
+def cli_seed():
+    """Tras `flask db upgrade`: tablas que aún no tienen migración + datos demo (Render)."""
+    # create_all solo añade tablas que falten; no pisa las creadas por Alembic.
+    db.create_all()
+    seed_demo_data()
+    print("Seed listo.")
+
+
+# SQLite local: create_all + reparaciones PRAGMA + datos demo.
+# PostgreSQL: NO crear tablas aquí — choca con Alembic (`relation already exists`). Usar migraciones + `flask seed`.
 with app.app_context():
     database_dir = os.path.join(app.root_path, 'database')
     if not os.path.exists(database_dir):
         os.makedirs(database_dir)
-    
-    # Intentar crear tablas. Si cambiaste el esquema, es posible que 
-    # necesites borrar citas.db manualmente una vez para que se cree con los nuevos campos.
-    try:
-        db.create_all()
-        # Asegurar que la columna foto_perfil existe (BD creadas antes de añadirla)
+
+    if db.engine.url.drivername != 'sqlite':
+        pass
+    else:
         try:
-            from sqlalchemy import text
-            if db.engine.url.drivername == 'sqlite':
+            db.create_all()
+            try:
+                from sqlalchemy import text
                 with db.engine.connect() as conn:
                     r = conn.execute(text("PRAGMA table_info(usuario)"))
                     cols = [row[1] for row in r]
                     if 'foto_perfil' not in cols:
                         conn.execute(text("ALTER TABLE usuario ADD COLUMN foto_perfil VARCHAR(200)"))
-                    
-                    # Reparar usuario para consentimientos
+
                     r = conn.execute(text("PRAGMA table_info(usuario)"))
                     cols_user = [row[1] for row in r]
                     if 'acepto_consentimiento' not in cols_user:
                         conn.execute(text("ALTER TABLE usuario ADD COLUMN acepto_consentimiento BOOLEAN DEFAULT 0"))
                     if 'consentimiento_fecha' not in cols_user:
                         conn.execute(text("ALTER TABLE usuario ADD COLUMN consentimiento_fecha DATETIME"))
-                    
-                    # Reparar cita para Stripe
+
                     r = conn.execute(text("PRAGMA table_info(cita)"))
                     cols_cita = [row[1] for row in r]
                     if 'stripe_id' not in cols_cita:
                         conn.execute(text("ALTER TABLE cita ADD COLUMN stripe_id VARCHAR(200)"))
-                    
-                    # Reparar testimonio para relación con cliente
+
                     r = conn.execute(text("PRAGMA table_info(testimonio)"))
                     cols_testimonio = [row[1] for row in r]
                     if 'cliente_id' not in cols_testimonio:
@@ -291,38 +320,13 @@ with app.app_context():
                         conn.execute(text("ALTER TABLE testimonio ADD COLUMN fecha DATETIME"))
 
                     conn.commit()
-        except Exception:
-            pass
+            except Exception:
+                pass
 
-        # Sembrar servicios iniciales si la tabla está vacía
-        if Servicio.query.count() == 0:
-            servicios_iniciales = [
-                Servicio(nombre="Fisioterapia Deportiva", descripcion="Tratamiento de lesiones deportivas y mejora del rendimiento.", precio=500.0, duracion_minutos=60),
-                Servicio(nombre="Masaje Terapéutico", descripcion="Masaje para aliviar tensión muscular y estrés.", precio=400.0, duracion_minutos=45),
-                Servicio(nombre="Rehabilitación Post-Operatoria", descripcion="Cuidado especializado después de una cirugía.", precio=600.0, duracion_minutos=60)
-            ]
-            for s in servicios_iniciales:
-                db.session.add(s)
-            
-            # Crear admin inicial si no existe
-            if Usuario.query.filter_by(rol="admin").count() == 0:
-                hashed_pw = bcrypt.generate_password_hash("admin123").decode('utf-8')
-                admin = Usuario(nombre="Admin", email="admin@fisio.com", rol="admin", telefono="0000000000", password_hash=hashed_pw)
-                db.session.add(admin)
+            seed_demo_data()
 
-            # Sembrar FAQ y testimonio de ejemplo si están vacíos
-            if FAQ.query.count() == 0:
-                db.session.add(FAQ(pregunta="¿Necesito orden médica para asistir?", respuesta="No es obligatorio, pero si vienes por rehabilitación post-lesión es recomendable traer estudios o indicaciones de tu médico."))
-                db.session.add(FAQ(pregunta="¿Cuánto dura una sesión?", respuesta="Depende del servicio: entre 45 y 60 minutos. Puedes ver la duración en cada servicio."))
-            if Testimonio.query.count() == 0:
-                db.session.add(Testimonio(nombre_cliente="María G.", contenido="Excelente atención y muy buenos resultados con la rehabilitación.", estrellas=5, activo=True))
-
-            db.session.commit()
-
-
-    except Exception as e:
-        print(f"Error inicializando DB: {e}")
-        # Si hay error de columnas faltantes, se recomienda borrar el archivo .db
+        except Exception as e:
+            print(f"Error inicializando DB: {e}")
 
 @app.route("/favicon.ico")
 def favicon():
