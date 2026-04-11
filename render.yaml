@@ -1,10 +1,12 @@
 # Blueprint Render (plan gratuito): servicio web + PostgreSQL.
 # Debe estar en la RAÍZ del repositorio Git que conectes a Render.
 #
-# Monorepo (repo raíz = carpeta padre de fisio_web): mueve este archivo a esa raíz y añade
-#   rootDir: fisio_web
-# como propiedad del servicio web (mismo nivel que "type: web").
+# IMPORTANTE — estructura del repo en GitHub:
+# - Si en la raíz del repo tienes app.py y requirements.txt (repo = carpeta fisio_web),
+#   NO pongas rootDir (deja comentada la línea de abajo).
+# - Si en GitHub la raíz tiene una carpeta fisio_web/ con app.py dentro, DESCOMENTA rootDir.
 #
+# https://render.com/docs/blueprint-spec
 # https://render.com/docs/deploy-flask
 
 version: "1"
@@ -17,12 +19,15 @@ databases:
 services:
   - type: web
     name: fisio-web
+    # Descomenta solo si app.py NO está en la raíz del repo sino en fisio_web/:
+    # rootDir: fisio_web
     runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt
-    # Sin bash scripts (evita CRLF / shebang roto en Windows). FLASK_APP viene de envVars.
-    preDeployCommand: "flask db upgrade && flask seed"
-    startCommand: "gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 180 --graceful-timeout 30 --access-logfile - --error-logfile - --forwarded-allow-ips='*'"
+    # Comillas simples: en YAML, && sin comillas rompe el parseo (& es ancla).
+    preDeployCommand: 'flask db upgrade && flask seed'
+    # Comillas simples: $PORT se expande al ejecutar el comando en el shell de Render.
+    startCommand: 'gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 180 --graceful-timeout 30 --access-logfile - --error-logfile - --forwarded-allow-ips=*'
     healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
