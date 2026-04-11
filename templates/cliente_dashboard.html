@@ -59,12 +59,14 @@
                                             class="btn btn-sm btn-outline-dark shadow-sm">
                                             <i class="bi bi-file-earmark-pdf"></i> PDF
                                         </a>
-                                        {% else %}
+                                        {% elif stripe_habilitado %}
                                         <a href="{{ url_for('crear_sesion_pago', cita_id=cita.id) }}"
                                             class="btn btn-sm btn-primary shadow-sm"
                                             onclick="this.innerHTML='Procesando...'; this.classList.add('disabled');">
                                             <i class="bi bi-credit-card me-1"></i> Pagar
                                         </a>
+                                        {% else %}
+                                        <span class="text-muted small">Pendiente (pago en clínica)</span>
                                         {% endif %}
                                     </td>
                                 </tr>

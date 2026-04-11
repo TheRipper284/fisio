@@ -13,13 +13,18 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 import io
-import stripe
 
 load_dotenv()
 
-# --- CONFIGURACIÓN DE STRIPE (solo variables de entorno; ver .env.example) ---
-stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
-STRIPE_PUBLIC_KEY = os.environ.get('STRIPE_PUBLIC_KEY', '')
+# --- STRIPE (desactivado temporalmente; poner True para reactivar pagos con tarjeta) ---
+STRIPE_ENABLED = False
+if STRIPE_ENABLED:
+    import stripe
+
+    stripe.api_key = os.environ.get("STRIPE_SECRET_KEY")
+else:
+    stripe = None
+STRIPE_PUBLIC_KEY = os.environ.get("STRIPE_PUBLIC_KEY", "") if STRIPE_ENABLED else ""
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get(
@@ -394,6 +399,13 @@ def crear_sesion_pago(cita_id):
     if cita.cliente_id != current_user.id:
         return jsonify({"error": "No autorizado"}), 403
 
+    if not STRIPE_ENABLED:
+        flash(
+            "El pago con tarjeta no está disponible temporalmente. Puedes pagar en recepción.",
+            "info",
+        )
+        return redirect(url_for("cliente_dashboard"))
+
     if not stripe.api_key:
         flash(
             "Los pagos con tarjeta no están configurados (falta STRIPE_SECRET_KEY en el entorno).",
@@ -430,14 +442,14 @@ def pago_exitoso(cita_id):
     session_id = request.args.get('session_id')
     cita = Cita.query.get_or_404(cita_id)
 
-    if session_id and stripe.api_key:
+    if STRIPE_ENABLED and session_id and stripe and stripe.api_key:
         session = stripe.checkout.Session.retrieve(session_id)
         cita.pagado = True
         cita.stripe_id = session.id
         cita.metodo_pago = "Stripe / Tarjeta"
         db.session.commit()
         flash("¡Pago realizado con éxito!", "success")
-    
+
     return redirect(url_for('cliente_dashboard'))
 
 @app.context_processor
@@ -446,7 +458,8 @@ def inject_globals():
     return {
         'servicios_global': servicios_lista,
         'fecha_actual_global': date.today().isoformat(),
-        'stripe_public_key': STRIPE_PUBLIC_KEY
+        'stripe_public_key': STRIPE_PUBLIC_KEY,
+        'stripe_habilitado': STRIPE_ENABLED,
     }
 
 @app.route("/servicios")

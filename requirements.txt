@@ -7,6 +7,6 @@ Flask-Mail>=0.10.0,<1
 Flask-WTF>=1.2.0,<2
 python-dotenv>=1.0.0,<2
 reportlab>=4.0.0,<5
-stripe>=10.0.0,<15
+# stripe>=10.0.0,<15  # opcional mientras STRIPE_ENABLED = False en app.py
 gunicorn>=22.0.0,<24
 psycopg2-binary>=2.9.9,<3
