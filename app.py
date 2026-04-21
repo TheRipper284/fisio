@@ -1,4 +1,5 @@
 import os
+import tempfile
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from flask_sqlalchemy import SQLAlchemy
@@ -48,9 +49,18 @@ if database_url:
         database_url += '&sslmode=require' if '?' in database_url else '?sslmode=require'
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 else:
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(
-        basedir, 'database', 'citas.db'
-    )
+    # En entornos serverless (ej. /var/task) el código es de solo lectura.
+    # Si no hay DATABASE_URL, usamos una ruta SQLite escribible.
+    sqlite_dir = os.environ.get('SQLITE_DIR')
+    if not sqlite_dir:
+        if os.environ.get('VERCEL') or basedir.startswith('/var/task'):
+            sqlite_dir = tempfile.gettempdir()
+        else:
+            sqlite_dir = os.path.join(basedir, 'database')
+
+    os.makedirs(sqlite_dir, exist_ok=True)
+    sqlite_path = os.path.join(sqlite_dir, 'citas.db')
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + sqlite_path
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
