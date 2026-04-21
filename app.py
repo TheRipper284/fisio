@@ -15,6 +15,7 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 import io
+from sqlalchemy import inspect, text
 
 load_dotenv()
 
@@ -36,10 +37,30 @@ app.config['SECRET_KEY'] = os.environ.get(
 # Usar ruta absoluta para evitar errores en Windows
 basedir = os.path.abspath(os.path.dirname(__file__))
 database_url = os.environ.get('DATABASE_URL')
+is_serverless_runtime = bool(os.environ.get('VERCEL')) or basedir.startswith('/var/task')
+
+def _build_sqlite_uri(base_uri=None):
+    sqlite_dir = os.environ.get('SQLITE_DIR')
+    if not sqlite_dir:
+        sqlite_dir = tempfile.gettempdir() if is_serverless_runtime else os.path.join(basedir, 'database')
+    os.makedirs(sqlite_dir, exist_ok=True)
+
+    db_name = 'citas.db'
+    if base_uri and base_uri.startswith('sqlite:///'):
+        candidate = base_uri.replace('sqlite:///', '', 1).strip()
+        if candidate:
+            db_name = os.path.basename(candidate) or db_name
+
+    sqlite_path = os.path.join(sqlite_dir, db_name)
+    return 'sqlite:///' + sqlite_path
+
 if database_url:
     # Render/heroku a veces usan postgres://; SQLAlchemy 2 espera postgresql://
     if database_url.startswith('postgres://'):
         database_url = database_url.replace('postgres://', 'postgresql://', 1)
+    # Si DATABASE_URL usa SQLite en serverless, movemos el archivo a una ruta escribible.
+    if database_url.startswith('sqlite:///') and is_serverless_runtime:
+        database_url = _build_sqlite_uri(database_url)
     # Render: SSL suele ser necesario. Si falla la conexión, define DATABASE_SSL_DISABLE=1 en el dashboard.
     if (
         database_url.startswith('postgresql')
@@ -51,16 +72,7 @@ if database_url:
 else:
     # En entornos serverless (ej. /var/task) el código es de solo lectura.
     # Si no hay DATABASE_URL, usamos una ruta SQLite escribible.
-    sqlite_dir = os.environ.get('SQLITE_DIR')
-    if not sqlite_dir:
-        if os.environ.get('VERCEL') or basedir.startswith('/var/task'):
-            sqlite_dir = tempfile.gettempdir()
-        else:
-            sqlite_dir = os.path.join(basedir, 'database')
-
-    os.makedirs(sqlite_dir, exist_ok=True)
-    sqlite_path = os.path.join(sqlite_dir, 'citas.db')
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + sqlite_path
+    app.config['SQLALCHEMY_DATABASE_URI'] = _build_sqlite_uri()
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
@@ -270,6 +282,56 @@ class Archivo(db.Model):
 
 
 
+def _ensure_sqlite_schema():
+    """Añade columnas que faltan cuando la BD SQLite es anterior al modelo (sin `flask db upgrade`)."""
+    if db.engine.url.drivername != "sqlite":
+        return
+    try:
+        db.create_all()
+        insp = inspect(db.engine)
+        tables = set(insp.get_table_names() or [])
+
+        statements = []
+        if "usuario" in tables:
+            cols = {c["name"] for c in insp.get_columns("usuario")}
+            if "password_hash" not in cols:
+                statements.append("ALTER TABLE usuario ADD COLUMN password_hash VARCHAR(128)")
+            if "foto_perfil" not in cols:
+                statements.append("ALTER TABLE usuario ADD COLUMN foto_perfil VARCHAR(200)")
+            if "acepto_consentimiento" not in cols:
+                statements.append(
+                    "ALTER TABLE usuario ADD COLUMN acepto_consentimiento BOOLEAN DEFAULT 0"
+                )
+            if "consentimiento_fecha" not in cols:
+                statements.append("ALTER TABLE usuario ADD COLUMN consentimiento_fecha DATETIME")
+
+        if "cita" in tables:
+            cols = {c["name"] for c in insp.get_columns("cita")}
+            if "empleado_id" not in cols:
+                statements.append("ALTER TABLE cita ADD COLUMN empleado_id INTEGER")
+            if "pagado" not in cols:
+                statements.append("ALTER TABLE cita ADD COLUMN pagado BOOLEAN DEFAULT 0")
+            if "metodo_pago" not in cols:
+                statements.append("ALTER TABLE cita ADD COLUMN metodo_pago VARCHAR(50)")
+            if "stripe_id" not in cols:
+                statements.append("ALTER TABLE cita ADD COLUMN stripe_id VARCHAR(200)")
+
+        if "testimonio" in tables:
+            cols = {c["name"] for c in insp.get_columns("testimonio")}
+            if "cliente_id" not in cols:
+                statements.append("ALTER TABLE testimonio ADD COLUMN cliente_id INTEGER")
+            if "fecha" not in cols:
+                statements.append("ALTER TABLE testimonio ADD COLUMN fecha DATETIME")
+
+        if not statements:
+            return
+        with db.engine.begin() as conn:
+            for sql in statements:
+                conn.execute(text(sql))
+    except Exception as e:
+        print(f"Error reparando esquema SQLite: {e}")
+
+
 def seed_demo_data():
     """Servicios, admin y datos demo si la BD está vacía. Úsalo tras migraciones (PostgreSQL)."""
     if Servicio.query.count() != 0:
@@ -297,12 +359,13 @@ def seed_demo_data():
 def cli_seed():
     """Tras `flask db upgrade`: tablas que aún no tienen migración + datos demo (Render)."""
     # create_all solo añade tablas que falten; no pisa las creadas por Alembic.
+    _ensure_sqlite_schema()
     db.create_all()
     seed_demo_data()
     print("Seed listo.")
 
 
-# SQLite local: create_all + reparaciones PRAGMA + datos demo.
+# SQLite local: create_all + columnas faltantes + datos demo.
 # PostgreSQL: NO crear tablas aquí — choca con Alembic (`relation already exists`). Usar migraciones + `flask seed`.
 with app.app_context():
     database_dir = os.path.join(app.root_path, 'database')
@@ -313,38 +376,7 @@ with app.app_context():
         pass
     else:
         try:
-            db.create_all()
-            try:
-                from sqlalchemy import text
-                with db.engine.connect() as conn:
-                    r = conn.execute(text("PRAGMA table_info(usuario)"))
-                    cols = [row[1] for row in r]
-                    if 'foto_perfil' not in cols:
-                        conn.execute(text("ALTER TABLE usuario ADD COLUMN foto_perfil VARCHAR(200)"))
-
-                    r = conn.execute(text("PRAGMA table_info(usuario)"))
-                    cols_user = [row[1] for row in r]
-                    if 'acepto_consentimiento' not in cols_user:
-                        conn.execute(text("ALTER TABLE usuario ADD COLUMN acepto_consentimiento BOOLEAN DEFAULT 0"))
-                    if 'consentimiento_fecha' not in cols_user:
-                        conn.execute(text("ALTER TABLE usuario ADD COLUMN consentimiento_fecha DATETIME"))
-
-                    r = conn.execute(text("PRAGMA table_info(cita)"))
-                    cols_cita = [row[1] for row in r]
-                    if 'stripe_id' not in cols_cita:
-                        conn.execute(text("ALTER TABLE cita ADD COLUMN stripe_id VARCHAR(200)"))
-
-                    r = conn.execute(text("PRAGMA table_info(testimonio)"))
-                    cols_testimonio = [row[1] for row in r]
-                    if 'cliente_id' not in cols_testimonio:
-                        conn.execute(text("ALTER TABLE testimonio ADD COLUMN cliente_id INTEGER"))
-                    if 'fecha' not in cols_testimonio:
-                        conn.execute(text("ALTER TABLE testimonio ADD COLUMN fecha DATETIME"))
-
-                    conn.commit()
-            except Exception:
-                pass
-
+            _ensure_sqlite_schema()
             seed_demo_data()
 
         except Exception as e:
