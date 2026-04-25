@@ -21,10 +21,10 @@
                     <p class="text-muted small mb-2">
                         {{ (servicio.descripcion or '')[:100] }}{% if (servicio.descripcion or '')|length > 100 %}...{% endif %}
                     </p>
-                    <p class="fw-bold text-info mb-1">$ {{ servicio.precio }}</p>
+                    <p class="fw-bold text-info mb-1">${{ '%.0f'|format(servicio.precio) }}</p>
                     <p class="small text-muted mb-1">Duración: {{ servicio.duracion_minutos }} minutos</p>
                     <p class="text-info small mb-3">
-                        <i class="bi bi-people-fill"></i> {{ servicio.especialistas.count() }} Especialistas
+                        <i class="bi bi-people-fill"></i> {{ especialistas_para_servicio(servicio)|length }} Especialistas
                     </p>
 
                     <div class="d-flex gap-2">

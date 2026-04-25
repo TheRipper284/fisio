@@ -1,7 +1,7 @@
 import os
 import tempfile
 from dotenv import load_dotenv
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, abort
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, has_app_context, current_app
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, date, timedelta 
 from flask_migrate import Migrate
@@ -360,6 +360,69 @@ def seed_demo_data():
     db.session.commit()
 
 
+def _auto_seed_demo_staff_enabled():
+    """En Vercel/serverless suele faltar un empleado para agendar; se puede forzar con AUTO_SEED_DEMO_STAFF=1 o desactivar con =0."""
+    v = (os.environ.get("AUTO_SEED_DEMO_STAFF") or "").strip().lower()
+    if v in ("0", "false", "no"):
+        return False
+    if v in ("1", "true", "yes"):
+        return True
+    if os.environ.get("VERCEL"):
+        return True
+    if os.environ.get("FLASK_DEBUG", "").strip() in ("1", "true", "yes"):
+        return True
+    try:
+        if has_app_context() and current_app and current_app.debug:
+            return True
+    except RuntimeError:
+        pass
+    return False
+
+
+def ensure_demo_empleado_y_asignaciones(*, force=False):
+    """
+    Si hay servicios pero ningún rol «empleado», crea un fisioterapeuta demo y lo enlaza a todos los servicios.
+    Evita API /api/especialistas vacía y slots sin horarios en despliegues de prueba (p. ej. Vercel).
+    force=True: usar desde `flask seed` aunque no haya VERCEL (p. ej. PostgreSQL en Render).
+    """
+    if not force and not _auto_seed_demo_staff_enabled():
+        return
+    if Usuario.query.filter_by(rol="empleado").count() > 0:
+        return
+    servicios = Servicio.query.all()
+    if not servicios:
+        return
+    email_demo = (os.environ.get("DEMO_EMPLEADO_EMAIL") or "fisio.demo@centro.app").strip().lower()
+    pw_demo = os.environ.get("DEMO_EMPLEADO_PASSWORD") or "empleado123"
+    nombre_demo = (os.environ.get("DEMO_EMPLEADO_NOMBRE") or "Fisioterapeuta Demo").strip() or "Fisioterapeuta Demo"
+    try:
+        emp = Usuario.query.filter_by(email=email_demo).first()
+        if emp:
+            if emp.rol != "empleado":
+                return
+        else:
+            emp = Usuario(
+                nombre=nombre_demo,
+                email=email_demo,
+                rol="empleado",
+                telefono="0000000001",
+                password_hash=bcrypt.generate_password_hash(pw_demo).decode("utf-8"),
+                acepto_consentimiento=True,
+                consentimiento_fecha=datetime.utcnow(),
+            )
+            db.session.add(emp)
+            db.session.flush()
+        for s in servicios:
+            if s.especialistas.filter(Usuario.id == emp.id).first() is None:
+                s.especialistas.append(emp)
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+    except Exception as e:
+        db.session.rollback()
+        print(f"ensure_demo_empleado_y_asignaciones: {e}")
+
+
 @app.cli.command("seed")
 def cli_seed():
     """Tras `flask db upgrade`: tablas que aún no tienen migración + datos demo (Render)."""
@@ -367,6 +430,7 @@ def cli_seed():
     _ensure_sqlite_schema()
     db.create_all()
     seed_demo_data()
+    ensure_demo_empleado_y_asignaciones(force=True)
     print("Seed listo.")
 
 
@@ -377,15 +441,29 @@ with app.app_context():
     if not os.path.exists(database_dir):
         os.makedirs(database_dir)
 
-    if db.engine.url.drivername != 'sqlite':
-        pass
-    else:
-        try:
+    try:
+        if db.engine.url.drivername == "sqlite":
             _ensure_sqlite_schema()
             seed_demo_data()
+        ensure_demo_empleado_y_asignaciones()
+    except Exception as e:
+        print(f"Error inicializando DB: {e}")
 
-        except Exception as e:
-            print(f"Error inicializando DB: {e}")
+
+@app.before_request
+def _lazy_ensure_demo_staff():
+    """Primera petición en serverless: por si el import corrió antes de tener tablas o BD vacía."""
+    if getattr(app, "_lazy_staff_done", False):
+        return
+    if not _auto_seed_demo_staff_enabled():
+        app._lazy_staff_done = True
+        return
+    app._lazy_staff_done = True
+    try:
+        ensure_demo_empleado_y_asignaciones()
+    except Exception as e:
+        print(f"_lazy_ensure_demo_staff: {e}")
+
 
 @app.route("/health")
 def health():
@@ -599,19 +677,23 @@ def registro():
             return redirect(url_for("registro"))
             
         hashed_pw = bcrypt.generate_password_hash(password).decode('utf-8')
+        ahora = datetime.utcnow()
         nuevo_usuario = Usuario(
-            nombre=nombre, 
-            email=email, 
-            password_hash=hashed_pw, 
-            telefono=telefono, 
-            rol='cliente'
+            nombre=nombre,
+            email=email,
+            password_hash=hashed_pw,
+            telefono=telefono,
+            rol='cliente',
+            acepto_consentimiento=True,
+            consentimiento_fecha=ahora,
         )
         db.session.add(nuevo_usuario)
         db.session.commit()
-        
-        login_user(nuevo_usuario)
+        db.session.refresh(nuevo_usuario)
+
+        login_user(nuevo_usuario, remember=True)
         flash(f"Cuenta creada. ¡Bienvenido, {nombre}!", "success")
-        return redirect(url_for("cliente_dashboard"))
+        return redirect(url_for("dashboard"))
         
     return render_template("registro.html")
 
@@ -657,15 +739,19 @@ def gestion_usuarios():
     usuarios = Usuario.query.filter(Usuario.rol.in_(['admin', 'empleado', 'recepcionista'])).all()
     return render_template("admin_usuarios.html", usuarios=usuarios)
 
-@app.route("/admin/usuario/<int:id>/editar", methods=["GET", "POST"])
+@app.route("/admin/usuario/<int:usuario_id>/editar", methods=["GET", "POST"])
 @login_required
-def editar_usuario(id):
+def editar_usuario(usuario_id):
     if current_user.rol != 'admin':
         return redirect(url_for("index"))
-    
-    usuario = db.session.get(Usuario, id)
+
+    usuario = db.session.get(Usuario, usuario_id)
     if usuario is None:
-        abort(404)
+        flash(
+            "Ese usuario no existe o ya fue eliminado. Actualiza la lista de personal.",
+            "warning",
+        )
+        return redirect(url_for("gestion_usuarios"))
     if request.method == "POST":
         nombre = request.form.get("nombre", "").strip()
         email = request.form.get("email", "").strip().lower()
@@ -727,8 +813,14 @@ def asignar_especialistas(id):
         db.session.commit()
         flash(f"Especialistas asignados correctamente a {servicio.nombre}.", "success")
         return redirect(url_for("admin"))
-        
-    return render_template("admin_asignar_especialistas.html", servicio=servicio, empleados=empleados)
+
+    ids_asignados = {e.id for e in servicio.especialistas.all()}
+    return render_template(
+        "admin_asignar_especialistas.html",
+        servicio=servicio,
+        empleados=empleados,
+        ids_asignados=ids_asignados,
+    )
 
 # --- RUTAS FASE 2 ---
 
@@ -783,6 +875,39 @@ def contactos_permitidos(user):
         # Admin solo puede mensajear al personal (sus trabajadores), no a clientes.
         return Usuario.query.filter(Usuario.rol.in_(['empleado', 'recepcionista'])).order_by(Usuario.nombre).all()
     return []
+
+
+def especialistas_para_servicio(servicio):
+    """
+    Quienes pueden atender un servicio: los asignados en admin (M2M).
+    Si aún no hay ninguno asignado, se listan todos los fisioterapeutas (empleado),
+    para que en pruebas o recién desplegado el personal creado pueda elegirse sin paso extra.
+    """
+    if not servicio:
+        return []
+    asignados = servicio.especialistas.all()
+    if asignados:
+        return asignados
+    return (
+        Usuario.query.filter(Usuario.rol == "empleado")
+        .order_by(Usuario.nombre)
+        .all()
+    )
+
+
+def empleado_autorizado_para_servicio(empleado, servicio):
+    """True si el usuario puede tomar citas de ese servicio (reserva / API de slots)."""
+    if not empleado or not servicio or empleado.rol not in ("empleado", "admin"):
+        return False
+    if servicio.especialistas.count() == 0:
+        return True
+    return servicio.especialistas.filter(Usuario.id == empleado.id).first() is not None
+
+
+@app.context_processor
+def inject_booking_helpers():
+    return {"especialistas_para_servicio": especialistas_para_servicio}
+
 
 @app.route("/empleado/cita/<int:id>/completar")
 @login_required
@@ -1091,12 +1216,13 @@ def api_especialistas():
     servicio_id = request.args.get("servicio_id")
     if not servicio_id:
         return jsonify({"error": "Falta servicio_id"}), 400
-    
-    servicio = Servicio.query.get(int(servicio_id))
+
+    servicio = db.session.get(Servicio, int(servicio_id))
     if not servicio:
         return jsonify({"error": "Servicio no encontrado"}), 404
-    
-    especialistas = [{"id": e.id, "nombre": e.nombre} for e in servicio.especialistas.all()]
+
+    lista = especialistas_para_servicio(servicio)
+    especialistas = [{"id": e.id, "nombre": e.nombre} for e in lista]
     return jsonify({"especialistas": especialistas})
 
 @app.route("/admin/stats")
@@ -1137,18 +1263,26 @@ def admin_stats():
 
 def obtener_slots_disponibles(fecha_dt, servicio_id, empleado_id=None):
     """Genera slots de tiempo para una fecha y servicio específicos."""
-    servicio = Servicio.query.get(servicio_id)
-    if not servicio: return []
-    
-    # Determinar qué especialistas considerar
+    servicio = db.session.get(Servicio, servicio_id)
+    if not servicio:
+        return []
+
+    pool = especialistas_para_servicio(servicio)
+    pool_ids = {e.id for e in pool}
+
     if empleado_id:
-        especialistas = [Usuario.query.get(empleado_id)]
-        if not especialistas[0] or especialistas[0].rol not in ['empleado', 'admin']:
+        try:
+            eid = int(empleado_id)
+        except (TypeError, ValueError):
             return []
+        empleado = db.session.get(Usuario, eid)
+        if not empleado or empleado.id not in pool_ids:
+            return []
+        especialistas = [empleado]
     else:
-        especialistas = servicio.especialistas.all()
-        
-    if not especialistas or not especialistas[0]:
+        especialistas = pool
+
+    if not especialistas:
         return []
     
     slots_disponibles = []
@@ -1200,8 +1334,6 @@ def obtener_slots_disponibles(fecha_dt, servicio_id, empleado_id=None):
             actual += timedelta(minutes=30) # Saltos de 30 min para mayor flexibilidad
 
     slots_disponibles.sort()
-    return slots_disponibles
-        
     return slots_disponibles
 
 
@@ -1267,9 +1399,10 @@ def agendar():
 
             # Verificar disponibilidad real y buscar un especialista libre
             if empleado_id:
-                # Si el usuario eligió a alguien específico, validamos que esté asignado al servicio
-                especialista_libre = Usuario.query.get(int(empleado_id))
-                if not especialista_libre or servicio not in especialista_libre.servicios:
+                especialista_libre = db.session.get(Usuario, int(empleado_id))
+                if not especialista_libre or not empleado_autorizado_para_servicio(
+                    especialista_libre, servicio
+                ):
                     flash("El especialista seleccionado no está disponible para este servicio.", "danger")
                     return redirect(url_for("agendar"))
                 
@@ -1284,10 +1417,12 @@ def agendar():
                     flash("El especialista ya tiene una cita en ese horario.", "danger")
                     return redirect(url_for("agendar"))
             else:
-                # Si no eligió, buscamos cualquiera disponible (lógica anterior)
-                especialistas = servicio.especialistas.all()
+                especialistas = especialistas_para_servicio(servicio)
                 if not especialistas:
-                    flash("No hay especialistas asignados para este servicio actualmente.", "danger")
+                    flash(
+                        "No hay fisioterapeutas disponibles. Crea al menos un usuario con rol «empleado».",
+                        "danger",
+                    )
                     return redirect(url_for("agendar"))
 
                 especialista_libre = None

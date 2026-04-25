@@ -9,7 +9,8 @@
                     <h4 class="mb-0">Asignar Especialistas a: {{ servicio.nombre }}</h4>
                 </div>
                 <div class="card-body p-4">
-                    <p class="text-muted">Selecciona los empleados que pueden realizar este servicio.</p>
+                    <p class="text-muted mb-1">Selecciona los empleados que pueden realizar este servicio.</p>
+                    <p class="small text-muted">Si guardas sin marcar a nadie, <strong>cualquier fisioterapeuta</strong> (rol empleado) podrá elegirse al agendar (útil en pruebas). Si marcas uno o más, solo ellos aparecerán para este servicio.</p>
 
                     <form method="POST">
                         {% include '_csrf.html' %}
@@ -17,11 +18,11 @@
                             {% for empleado in empleados %}
                             <div class="col-md-6">
                                 <div
-                                    class="card border rounded-3 p-3 h-100 {% if empleado in servicio.especialistas %} border-primary bg-light {% endif %}">
+                                    class="card border rounded-3 p-3 h-100 {% if empleado.id in ids_asignados %} border-primary bg-light {% endif %}">
                                     <div class="form-check">
                                         <input class="form-check-input" type="checkbox" name="empleados"
                                             value="{{ empleado.id }}" id="emp{{ empleado.id }}"
-                                            {% if empleado in servicio.especialistas %} checked {% endif %}>
+                                            {% if empleado.id in ids_asignados %} checked {% endif %}>
                                         <label class="form-check-label d-block ms-2" for="emp{{ empleado.id }}">
                                             <div class="fw-bold">{{ empleado.nombre }}</div>
                                             <div class="small text-muted">{{ empleado.email }}</div>
