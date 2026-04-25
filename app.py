@@ -1,7 +1,7 @@
 import os
 import tempfile
 from dotenv import load_dotenv
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, abort
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, date, timedelta 
 from flask_migrate import Migrate
@@ -15,7 +15,8 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 import io
-from sqlalchemy import inspect, text
+from sqlalchemy import inspect, text, delete
+from sqlalchemy.exc import IntegrityError
 
 load_dotenv()
 
@@ -114,7 +115,11 @@ def allowed_file(filename):
 
 @login_manager.user_loader
 def load_user(user_id):
-    return Usuario.query.get(int(user_id))
+    try:
+        uid = int(user_id)
+    except (TypeError, ValueError):
+        return None
+    return db.session.get(Usuario, uid)
 
 
 # Tabla de asociación para la relación Muchos a Muchos entre Usuarios (empleados) y Servicios
@@ -562,7 +567,7 @@ def login():
 
     if request.method == "POST":
         email = request.form.get("email", "").strip().lower()
-        password = request.form.get("password", "")
+        password = (request.form.get("password") or "").strip()
         usuario = Usuario.query.filter_by(email=email).first()
 
         if usuario and usuario.password_hash and bcrypt.check_password_hash(usuario.password_hash, password):
@@ -658,25 +663,49 @@ def editar_usuario(id):
     if current_user.rol != 'admin':
         return redirect(url_for("index"))
     
-    usuario = Usuario.query.get_or_404(id)
+    usuario = db.session.get(Usuario, id)
+    if usuario is None:
+        abort(404)
     if request.method == "POST":
-        usuario.nombre = request.form.get("nombre", "").strip()
-        usuario.email = request.form.get("email", "").strip().lower()
-        usuario.telefono = request.form.get("telefono", "").strip()
+        nombre = request.form.get("nombre", "").strip()
+        email = request.form.get("email", "").strip().lower()
+        telefono = request.form.get("telefono", "").strip()
         rol_nuevo = request.form.get("rol", "").strip()
+
+        if not nombre or not email:
+            flash("Nombre y correo son obligatorios.", "danger")
+            return render_template("admin_editar_usuario.html", usuario=usuario)
+
+        otro = Usuario.query.filter(Usuario.email == email, Usuario.id != usuario.id).first()
+        if otro:
+            flash("Ese correo ya está en uso por otro usuario.", "warning")
+            return render_template("admin_editar_usuario.html", usuario=usuario)
+
+        otros_admins = Usuario.query.filter(Usuario.rol == "admin", Usuario.id != usuario.id).count()
+        if usuario.rol == "admin" and rol_nuevo and rol_nuevo != "admin" and otros_admins == 0:
+            flash("No puedes quitar el rol de administrador al único administrador.", "danger")
+            return render_template("admin_editar_usuario.html", usuario=usuario)
+
+        usuario.nombre = nombre
+        usuario.email = email
+        usuario.telefono = telefono
         if rol_nuevo:
             usuario.rol = rol_nuevo
-        
-        # Opcional: actualizar contraseña si se proporciona (sin espacios accidentales)
+
         nueva_pw = request.form.get("password", "").strip()
         if nueva_pw:
-            usuario.password_hash = bcrypt.generate_password_hash(nueva_pw).decode('utf-8')
+            usuario.password_hash = bcrypt.generate_password_hash(nueva_pw).decode("utf-8")
 
-            
-        db.session.commit()
+        try:
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            flash("No se pudo guardar: el correo podría estar duplicado.", "danger")
+            return render_template("admin_editar_usuario.html", usuario=usuario)
+
         flash(f"Usuario {usuario.nombre} actualizado.", "success")
         return redirect(url_for("gestion_usuarios"))
-        
+
     return render_template("admin_editar_usuario.html", usuario=usuario)
 
 @app.route("/admin/servicio/<int:id>/asignar", methods=["GET", "POST"])
@@ -1338,27 +1367,34 @@ def limpiar_base_datos():
         flash("Acceso denegado.", "danger")
         return redirect(url_for("index"))
     try:
-        # Orden por dependencias de claves foráneas
+        # Orden por dependencias de claves foráneas (PostgreSQL exige esto; SQLite a veces no)
         NotaEvolucion.query.delete()
         Diagnostico.query.delete()
         Archivo.query.delete()
         Mensaje.query.delete()
         Cita.query.delete()
         Expediente.query.delete()
+        HorarioEspecialista.query.delete()
         db.session.commit()
 
-        # Eliminar todos los usuarios que no sean admin
-        Usuario.query.filter(Usuario.rol != 'admin').delete()
+        # Relación empleados ↔ servicios (debe vaciarse antes de borrar usuarios o servicios)
+        db.session.execute(delete(usuario_servicio))
         db.session.commit()
 
-        # Contenido y servicios
+        # Contenido que puede referenciar clientes (FK a usuario)
         FAQ.query.delete()
         Testimonio.query.delete()
-        Servicio.query.delete()
         try:
             Post.query.delete()
         except Exception:
             pass
+        db.session.commit()
+
+        # Solo mantener cuentas con rol administrador
+        Usuario.query.filter(Usuario.rol != "admin").delete(synchronize_session=False)
+        db.session.commit()
+
+        Servicio.query.delete()
         db.session.commit()
 
         # Re-sembrar servicios
